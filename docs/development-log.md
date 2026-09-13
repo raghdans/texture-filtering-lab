@@ -300,3 +300,34 @@ four enlarged previews retained the same eight-by-eight checker structure.
 - [ ] I understand why using a close resolution reduces aliasing and wasted work.
 - [x] I displayed the four automatically selected results.
 - [x] I verified the selected resolutions in the console output.
+
+## Iteration 8 - interactive mipmap selection
+
+### Goal
+
+Let the user resize the rendered texture and observe automatic mip-level
+selection in real time.
+
+### AI prompt
+
+> Add an interactive mode entered with `8` or `I`. Use the Up and Down arrow
+> keys to double or halve the output size between 8 and 512 pixels. After each
+> change, select the mipmap level automatically, redraw the centered texture,
+> and report both sizes in the window title and console. Preserve earlier modes.
+
+### Implementation and test result
+
+Interactive mode starts with a 256-pixel output. Up and Down double or halve
+the size within the 8-to-512 range. Every change reruns `chooseMipLevel`,
+recenters the image, and updates both the title and console.
+
+The student's screenshots verified entry into interactive mode and the full
+downward sequence `256 -> 128 -> 64 -> 32`. The selected level stayed at 64
+while appropriate, then changed automatically to 32 for the 32-pixel output.
+
+### Student review checklist
+
+- [ ] I understand why outputs larger than 64 use the original 64 mip level.
+- [ ] I understand why the selected level changes when output reaches 32.
+- [x] I changed the size interactively with the arrow keys.
+- [x] I captured the `Output 32 | Mip 32` result and console history.

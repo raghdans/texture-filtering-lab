@@ -5,6 +5,7 @@
 #include <cmath>
 #include <cstdint>
 #include <iostream>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -31,7 +32,8 @@ struct MipLevel {
 
 using MipChain = std::vector<MipLevel>;
 
-int gRequestedMode = 0; // 0 nearest, 1 bilinear, 2 split, 3 minified, 4 mipmap, 5 chain, 6 auto
+int gRequestedMode = 0; // modes 0-6 are fixed views; mode 7 is interactive
+int gRequestedOutputSize = 256;
 bool gQuitRequested = false;
 
 void keyboardCallback(mfb_window*, mfb_key key, mfb_key_mod, bool isPressed)
@@ -54,6 +56,12 @@ void keyboardCallback(mfb_window*, mfb_key key, mfb_key_mod, bool isPressed)
         gRequestedMode = 5;
     } else if (key == KB_KEY_7 || key == KB_KEY_A) {
         gRequestedMode = 6;
+    } else if (key == KB_KEY_8 || key == KB_KEY_I) {
+        gRequestedMode = 7;
+    } else if (key == KB_KEY_UP && gRequestedMode == 7) {
+        gRequestedOutputSize = std::min(gRequestedOutputSize * 2, 512);
+    } else if (key == KB_KEY_DOWN && gRequestedMode == 7) {
+        gRequestedOutputSize = std::max(gRequestedOutputSize / 2, 8);
     } else if (key == KB_KEY_ESCAPE) {
         gQuitRequested = true;
     }
@@ -275,9 +283,24 @@ void renderMode(
     const MipChain& denseMipChain,
     const MipChain& regularMipChain,
     Framebuffer& framebuffer,
-    int mode)
+    int mode,
+    int interactiveOutputSize)
 {
     framebuffer.fill(MFB_RGB(45, 49, 58));
+
+    if (mode == 7) {
+        const std::size_t level =
+            chooseMipLevel(regularMipChain, interactiveOutputSize);
+        const int left = (kWindowWidth - interactiveOutputSize) / 2;
+        const int top = (kWindowHeight - interactiveOutputSize) / 2;
+        renderMipPanel(
+            regularMipChain[level],
+            framebuffer,
+            left,
+            top,
+            interactiveOutputSize);
+        return;
+    }
 
     if (mode == 6) {
         renderAutomaticMipSelection(regularMipChain, framebuffer);
@@ -368,13 +391,15 @@ int main()
     // Windows stack. Static storage prevents a stack-overflow crash at startup.
     static Framebuffer framebuffer{};
     int currentMode = 0;
+    int currentOutputSize = gRequestedOutputSize;
     renderMode(
         texture,
         denseTexture,
         denseMipChain,
         regularMipChain,
         framebuffer,
-        currentMode);
+        currentMode,
+        gRequestedOutputSize);
 
     mfb_window* window = mfb_open_ex(
         "Texture Filtering Lab - Nearest Neighbor [1/N]",
@@ -386,10 +411,11 @@ int main()
         return 1;
     }
 
-    std::cout << "Iteration 7 adds automatic mipmap-level selection.\n";
+    std::cout << "Iteration 8 adds interactive size and mip-level selection.\n";
     std::cout << "Press 1/N for Nearest, 2/B for Bilinear, 3/S for Split,"
                  " 4/M for Minification, 5/P for Mipmap, 6/L for Levels,"
-                 " 7/A for Auto, or Escape to exit.\n";
+                 " 7/A for Auto, 8/I for Interactive, or Escape to exit.\n";
+    std::cout << "In Interactive mode, use Up/Down to change output size.\n";
     mfb_set_keyboard_callback(window, keyboardCallback);
 
     while (mfb_update_events(window) != MFB_STATE_EXIT) {
@@ -397,15 +423,20 @@ int main()
             break;
         }
 
-        if (gRequestedMode != currentMode) {
+        const bool modeChanged = gRequestedMode != currentMode;
+        const bool sizeChanged =
+            currentMode == 7 && gRequestedOutputSize != currentOutputSize;
+        if (modeChanged || sizeChanged) {
             currentMode = gRequestedMode;
+            currentOutputSize = gRequestedOutputSize;
             renderMode(
                 texture,
                 denseTexture,
                 denseMipChain,
                 regularMipChain,
                 framebuffer,
-                currentMode);
+                currentMode,
+                currentOutputSize);
             if (currentMode == 0) {
                 mfb_set_title(window, "Texture Filtering Lab - Nearest Neighbor [1/N]");
                 std::cout << "Mode: Nearest Neighbor\n";
@@ -432,12 +463,23 @@ int main()
                     window,
                     "Texture Filtering Lab - Mipmap Chain 64 to 1 [6/L]");
                 std::cout << "Mode: Mipmap levels 64, 32, 16, 8, 4, 2, 1\n";
-            } else {
+            } else if (currentMode == 6) {
                 mfb_set_title(
                     window,
                     "Texture Filtering Lab - Automatic Mipmap Selection [7/A]");
                 std::cout << "Automatic choices: output 64 -> level 64, "
                              "32 -> 32, 16 -> 16, 8 -> 8\n";
+            } else {
+                const std::size_t level =
+                    chooseMipLevel(regularMipChain, currentOutputSize);
+                const int mipSize = regularMipChain[level].size;
+                const std::string title =
+                    "Texture Filtering Lab - Output " +
+                    std::to_string(currentOutputSize) + " | Mip " +
+                    std::to_string(mipSize) + " [Up/Down]";
+                mfb_set_title(window, title.c_str());
+                std::cout << "Interactive: output " << currentOutputSize
+                          << " -> mip level " << mipSize << "\n";
             }
         }
 
