@@ -3,18 +3,17 @@
 An incremental computer-graphics project for implementing and comparing
 texture filtering methods.
 
-## Current state: iteration 1
+## Current state: iteration 3
 
-The program creates a small checkerboard texture in memory and enlarges it into
-a framebuffer using a manually implemented nearest-neighbor sampler. MiniFB,
+The program creates a small checkerboard texture in memory and enlarges it with
+manually implemented nearest-neighbor and bilinear samplers. It supports each
+filter separately and a side-by-side comparison mode. MiniFB,
 the same display library used by the course's HW1 project, presents the pixel
 buffer in a window. MiniFB is only the presentation layer; the sampling
 algorithm is implemented in `src/main.cpp`.
 
-The project does **not** yet contain bilinear filtering, mipmaps, trilinear
-filtering, camera controls, performance measurements, or a comparison UI.
-Those belong to later iterations and should be added only after this version
-has been built, run, and understood.
+The project does **not** yet contain mipmaps, trilinear filtering, camera
+controls, or performance measurements. Those belong to later iterations.
 
 ## Build on Windows
 
@@ -31,12 +30,13 @@ cmake --build build --config Release
 .\build\Release\texture_filtering_lab.exe
 ```
 
-Press Escape to close the program.
+Press `1/N` for nearest-neighbor, `2/B` for bilinear, `3/S` for the split
+comparison, or Escape to close the program.
 
 MiniFB is stored inside `external/minifb` under its MIT license. The project
 does not need Python or downloaded dependencies.
 
-## What to understand before iteration 2
+## What to understand
 
 1. The texture is a 64 x 64 array of packed RGB pixels.
 2. The framebuffer is a separate 960 x 640 pixel array.
@@ -45,7 +45,5 @@ does not need Python or downloaded dependencies.
 5. Clamping prevents sampling outside the texture array.
 6. MiniFB displays the completed framebuffer but does not perform filtering.
 
-## Planned next experiment
-
-Add a manually implemented bilinear sampler and keyboard controls for switching
-between nearest-neighbor and bilinear filtering.
+7. Split mode uses the same tested samplers and changes only the framebuffer
+   layout.

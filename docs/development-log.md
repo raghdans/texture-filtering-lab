@@ -138,3 +138,35 @@ reported each selected mode correctly.
 - [x] I built the project successfully.
 - [x] I switched between both filters and saved a screenshot.
 - [x] I recorded the input and color bugs and the changes that fixed them.
+
+## Iteration 3 - simultaneous comparison
+
+### Goal
+
+Show nearest-neighbor and bilinear results side by side so their visual
+difference can be inspected at the same moment.
+
+### AI prompt
+
+> Keep the two tested sampling functions unchanged. Add a third display mode
+> that draws nearest-neighbor on the left and bilinear on the right, with a
+> visible gap between them. Use `3` or `S` for this mode and retain the existing
+> single-filter modes. Do not add mipmaps in this iteration.
+
+### Implementation and test result
+
+The framebuffer layout was generalized into a reusable `renderPanel` function.
+Single-filter modes keep the original large image, while split mode draws two
+384 x 384 panels separated by a gray gap. The sampling functions themselves
+were not changed.
+
+The student's screenshot verified that `3/S` activates split mode, with sharp
+nearest-neighbor boundaries on the left and blended bilinear boundaries on the
+right. The window title and console also identify the comparison correctly.
+
+### Student review checklist
+
+- [ ] I can explain why both panels use the same source texture.
+- [ ] I can explain why only the right panel passes `true` to `renderPanel`.
+- [x] I activated split mode and saved a screenshot.
+- [x] I verified that the left and right panels look different as expected.

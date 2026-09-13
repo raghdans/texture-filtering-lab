@@ -12,12 +12,14 @@ constexpr int kWindowWidth = 960;
 constexpr int kWindowHeight = 640;
 constexpr int kTextureSize = 64;
 constexpr int kDisplaySize = 512;
+constexpr int kComparisonSize = 384;
+constexpr int kComparisonGap = 24;
 constexpr int kCheckerSize = 8;
 
 using Texture = std::array<std::uint32_t, kTextureSize * kTextureSize>;
 using Framebuffer = std::array<std::uint32_t, kWindowWidth * kWindowHeight>;
 
-int gRequestedFilter = 0; // 0 = nearest, 1 = bilinear
+int gRequestedMode = 0; // 0 = nearest, 1 = bilinear, 2 = side-by-side
 bool gQuitRequested = false;
 
 void keyboardCallback(mfb_window*, mfb_key key, mfb_key_mod, bool isPressed)
@@ -27,9 +29,11 @@ void keyboardCallback(mfb_window*, mfb_key key, mfb_key_mod, bool isPressed)
     }
 
     if (key == KB_KEY_1 || key == KB_KEY_N) {
-        gRequestedFilter = 0;
+        gRequestedMode = 0;
     } else if (key == KB_KEY_2 || key == KB_KEY_B) {
-        gRequestedFilter = 1;
+        gRequestedMode = 1;
+    } else if (key == KB_KEY_3 || key == KB_KEY_S) {
+        gRequestedMode = 2;
     } else if (key == KB_KEY_ESCAPE) {
         gQuitRequested = true;
     }
@@ -119,22 +123,20 @@ std::uint32_t sampleBilinear(const Texture& texture, float u, float v)
     return MFB_RGB(red, green, blue);
 }
 
-void renderTexture(
+void renderPanel(
     const Texture& texture,
     Framebuffer& framebuffer,
+    int left,
+    int top,
+    int displaySize,
     bool useBilinear)
 {
-    framebuffer.fill(MFB_RGB(45, 49, 58));
-
-    const int left = (kWindowWidth - kDisplaySize) / 2;
-    const int top = (kWindowHeight - kDisplaySize) / 2;
-
-    for (int screenY = 0; screenY < kDisplaySize; ++screenY) {
-        for (int screenX = 0; screenX < kDisplaySize; ++screenX) {
+    for (int screenY = 0; screenY < displaySize; ++screenY) {
+        for (int screenX = 0; screenX < displaySize; ++screenX) {
             const float u = static_cast<float>(screenX) /
-                            static_cast<float>(kDisplaySize - 1);
+                            static_cast<float>(displaySize - 1);
             const float v = static_cast<float>(screenY) /
-                            static_cast<float>(kDisplaySize - 1);
+                            static_cast<float>(displaySize - 1);
 
             const int framebufferX = left + screenX;
             const int framebufferY = top + screenY;
@@ -146,6 +148,30 @@ void renderTexture(
     }
 }
 
+void renderMode(const Texture& texture, Framebuffer& framebuffer, int mode)
+{
+    framebuffer.fill(MFB_RGB(45, 49, 58));
+
+    if (mode == 2) {
+        const int totalWidth = 2 * kComparisonSize + kComparisonGap;
+        const int left = (kWindowWidth - totalWidth) / 2;
+        const int top = (kWindowHeight - kComparisonSize) / 2;
+        renderPanel(texture, framebuffer, left, top, kComparisonSize, false);
+        renderPanel(
+            texture,
+            framebuffer,
+            left + kComparisonSize + kComparisonGap,
+            top,
+            kComparisonSize,
+            true);
+        return;
+    }
+
+    const int left = (kWindowWidth - kDisplaySize) / 2;
+    const int top = (kWindowHeight - kDisplaySize) / 2;
+    renderPanel(texture, framebuffer, left, top, kDisplaySize, mode == 1);
+}
+
 } // namespace
 
 int main()
@@ -154,11 +180,11 @@ int main()
     // A 960 x 640 RGBA framebuffer is about 2.5 MB, larger than the default
     // Windows stack. Static storage prevents a stack-overflow crash at startup.
     static Framebuffer framebuffer{};
-    bool useBilinear = false;
-    renderTexture(texture, framebuffer, useBilinear);
+    int currentMode = 0;
+    renderMode(texture, framebuffer, currentMode);
 
     mfb_window* window = mfb_open_ex(
-        "Texture Filtering Lab - Iteration 1: Nearest Neighbor",
+        "Texture Filtering Lab - Nearest Neighbor [1/N]",
         kWindowWidth,
         kWindowHeight,
         MFB_WF_RESIZABLE);
@@ -167,8 +193,9 @@ int main()
         return 1;
     }
 
-    std::cout << "Iteration 2 compares nearest-neighbor and bilinear sampling.\n";
-    std::cout << "Press 1/N for Nearest, 2/B for Bilinear, or Escape to exit.\n";
+    std::cout << "Iteration 3 adds a side-by-side filtering comparison.\n";
+    std::cout << "Press 1/N for Nearest, 2/B for Bilinear, 3/S for Split,"
+                 " or Escape to exit.\n";
     mfb_set_keyboard_callback(window, keyboardCallback);
 
     while (mfb_update_events(window) != MFB_STATE_EXIT) {
@@ -176,17 +203,21 @@ int main()
             break;
         }
 
-        if (gRequestedFilter == 0 && useBilinear) {
-            useBilinear = false;
-            renderTexture(texture, framebuffer, useBilinear);
-            mfb_set_title(window, "Texture Filtering Lab - Nearest Neighbor [1/N]");
-            std::cout << "Filter: Nearest Neighbor\n";
-        }
-        if (gRequestedFilter == 1 && !useBilinear) {
-            useBilinear = true;
-            renderTexture(texture, framebuffer, useBilinear);
-            mfb_set_title(window, "Texture Filtering Lab - Bilinear [2/B]");
-            std::cout << "Filter: Bilinear\n";
+        if (gRequestedMode != currentMode) {
+            currentMode = gRequestedMode;
+            renderMode(texture, framebuffer, currentMode);
+            if (currentMode == 0) {
+                mfb_set_title(window, "Texture Filtering Lab - Nearest Neighbor [1/N]");
+                std::cout << "Mode: Nearest Neighbor\n";
+            } else if (currentMode == 1) {
+                mfb_set_title(window, "Texture Filtering Lab - Bilinear [2/B]");
+                std::cout << "Mode: Bilinear\n";
+            } else {
+                mfb_set_title(
+                    window,
+                    "Texture Filtering Lab - Split: Nearest | Bilinear [3/S]");
+                std::cout << "Mode: Split comparison (Nearest | Bilinear)\n";
+            }
         }
 
         if (mfb_update_ex(
