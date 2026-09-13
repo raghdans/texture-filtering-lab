@@ -238,3 +238,34 @@ source block contains two blue and two white texels.
 - [ ] I understand why this particular mipmap becomes one uniform color.
 - [x] I ran mipmap mode and saved a screenshot.
 - [x] I observed that the false gradient disappears with the mipmap.
+
+## Iteration 6 - complete mipmap chain
+
+### Goal
+
+Generate every mipmap level from 64 x 64 down to 1 x 1 and display the levels
+as a descending sequence.
+
+### AI prompt
+
+> Generalize the tested 2 x 2 averaging step into a complete mipmap chain.
+> Build each level from the immediately preceding level until reaching 1 x 1.
+> Add a display mode for the seven levels and keep all prior modes unchanged.
+
+### Implementation and test result
+
+The fixed 32 x 32 mip type was generalized into a chain of levels. Starting
+with the original image, the program repeatedly halves the dimensions and
+averages 2 x 2 blocks until it reaches 1 x 1.
+
+The student's screenshot verified all seven levels in descending order. The
+larger levels retain the checker pattern. Once a level becomes too small to
+represent the original checks, it converges to their blue-gray average, as
+expected from correct low-pass filtering.
+
+### Student review checklist
+
+- [ ] I understand why each level has half the width and height of the previous one.
+- [ ] I understand why the final 1 x 1 level is the average color of the texture.
+- [x] I displayed and captured the complete seven-level chain.
+- [x] I verified that fine details disappear gradually at smaller levels.

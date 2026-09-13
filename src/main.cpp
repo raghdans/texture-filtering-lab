@@ -5,6 +5,8 @@
 #include <cmath>
 #include <cstdint>
 #include <iostream>
+#include <utility>
+#include <vector>
 
 namespace {
 
@@ -18,10 +20,16 @@ constexpr int kCheckerSize = 8;
 constexpr int kMinifiedSize = 32;
 
 using Texture = std::array<std::uint32_t, kTextureSize * kTextureSize>;
-using MipLevel = std::array<std::uint32_t, kMinifiedSize * kMinifiedSize>;
 using Framebuffer = std::array<std::uint32_t, kWindowWidth * kWindowHeight>;
 
-int gRequestedMode = 0; // 0 nearest, 1 bilinear, 2 split, 3 minified, 4 mipmap
+struct MipLevel {
+    int size;
+    std::vector<std::uint32_t> pixels;
+};
+
+using MipChain = std::vector<MipLevel>;
+
+int gRequestedMode = 0; // 0 nearest, 1 bilinear, 2 split, 3 minified, 4 mipmap, 5 chain
 bool gQuitRequested = false;
 
 void keyboardCallback(mfb_window*, mfb_key key, mfb_key_mod, bool isPressed)
@@ -40,6 +48,8 @@ void keyboardCallback(mfb_window*, mfb_key key, mfb_key_mod, bool isPressed)
         gRequestedMode = 3;
     } else if (key == KB_KEY_5 || key == KB_KEY_P) {
         gRequestedMode = 4;
+    } else if (key == KB_KEY_6 || key == KB_KEY_L) {
+        gRequestedMode = 5;
     } else if (key == KB_KEY_ESCAPE) {
         gQuitRequested = true;
     }
@@ -78,33 +88,52 @@ std::uint8_t colorChannel(std::uint32_t color, int shift)
     return static_cast<std::uint8_t>((color >> shift) & 0xffU);
 }
 
-MipLevel makeMipLevel(const Texture& texture)
+std::uint32_t averageFour(const std::uint32_t* colors)
 {
-    MipLevel mip{};
-    for (int y = 0; y < kMinifiedSize; ++y) {
-        for (int x = 0; x < kMinifiedSize; ++x) {
-            const int sourceX = x * 2;
-            const int sourceY = y * 2;
-            const auto texel = [&texture, sourceX, sourceY](int offsetX, int offsetY) {
-                return texture[static_cast<std::size_t>(
-                    (sourceY + offsetY) * kTextureSize + sourceX + offsetX)];
-            };
-
-            const std::uint32_t colors[4] = {
-                texel(0, 0), texel(1, 0), texel(0, 1), texel(1, 1)};
-            int red = 0;
-            int green = 0;
-            int blue = 0;
-            for (std::uint32_t color : colors) {
-                red += colorChannel(color, 16);
-                green += colorChannel(color, 8);
-                blue += colorChannel(color, 0);
-            }
-            mip[static_cast<std::size_t>(y * kMinifiedSize + x)] =
-                MFB_RGB(red / 4, green / 4, blue / 4);
-        }
+    int red = 0;
+    int green = 0;
+    int blue = 0;
+    for (int index = 0; index < 4; ++index) {
+        red += colorChannel(colors[index], 16);
+        green += colorChannel(colors[index], 8);
+        blue += colorChannel(colors[index], 0);
     }
-    return mip;
+    return MFB_RGB(red / 4, green / 4, blue / 4);
+}
+
+MipChain makeMipChain(const Texture& texture)
+{
+    MipChain chain;
+    chain.push_back({kTextureSize, {texture.begin(), texture.end()}});
+
+    while (chain.back().size > 1) {
+        const MipLevel& source = chain.back();
+        const int destinationSize = source.size / 2;
+        MipLevel destination{
+            destinationSize,
+            std::vector<std::uint32_t>(
+                static_cast<std::size_t>(destinationSize * destinationSize))};
+
+        for (int y = 0; y < destinationSize; ++y) {
+            for (int x = 0; x < destinationSize; ++x) {
+                const int sourceX = x * 2;
+                const int sourceY = y * 2;
+                const std::uint32_t colors[4] = {
+                    source.pixels[static_cast<std::size_t>(
+                        sourceY * source.size + sourceX)],
+                    source.pixels[static_cast<std::size_t>(
+                        sourceY * source.size + sourceX + 1)],
+                    source.pixels[static_cast<std::size_t>(
+                        (sourceY + 1) * source.size + sourceX)],
+                    source.pixels[static_cast<std::size_t>(
+                        (sourceY + 1) * source.size + sourceX + 1)]};
+                destination.pixels[static_cast<std::size_t>(
+                    y * destinationSize + x)] = averageFour(colors);
+            }
+        }
+        chain.push_back(std::move(destination));
+    }
+    return chain;
 }
 
 std::uint8_t interpolateChannel(
@@ -190,15 +219,16 @@ void renderMipPanel(
     const MipLevel& mip,
     Framebuffer& framebuffer,
     int left,
-    int top)
+    int top,
+    int displaySize)
 {
-    for (int screenY = 0; screenY < kComparisonSize; ++screenY) {
-        for (int screenX = 0; screenX < kComparisonSize; ++screenX) {
-            const int mipX = screenX * kMinifiedSize / kComparisonSize;
-            const int mipY = screenY * kMinifiedSize / kComparisonSize;
+    for (int screenY = 0; screenY < displaySize; ++screenY) {
+        for (int screenX = 0; screenX < displaySize; ++screenX) {
+            const int mipX = screenX * mip.size / displaySize;
+            const int mipY = screenY * mip.size / displaySize;
             framebuffer[static_cast<std::size_t>(
                 (top + screenY) * kWindowWidth + left + screenX)] =
-                mip[static_cast<std::size_t>(mipY * kMinifiedSize + mipX)];
+                mip.pixels[static_cast<std::size_t>(mipY * mip.size + mipX)];
         }
     }
 }
@@ -206,11 +236,25 @@ void renderMipPanel(
 void renderMode(
     const Texture& texture,
     const Texture& denseTexture,
-    const MipLevel& denseMip,
+    const MipChain& denseMipChain,
+    const MipChain& regularMipChain,
     Framebuffer& framebuffer,
     int mode)
 {
     framebuffer.fill(MFB_RGB(45, 49, 58));
+
+    if (mode == 5) {
+        const int previewSizes[] = {256, 160, 96, 56, 32, 16, 8};
+        int left = 70;
+        for (std::size_t level = 0; level < regularMipChain.size(); ++level) {
+            const int previewSize = previewSizes[level];
+            const int top = (kWindowHeight - previewSize) / 2;
+            renderMipPanel(
+                regularMipChain[level], framebuffer, left, top, previewSize);
+            left += previewSize + 24;
+        }
+        return;
+    }
 
     if (mode == 4) {
         const int totalWidth = 2 * kComparisonSize + kComparisonGap;
@@ -225,10 +269,11 @@ void renderMode(
             kMinifiedSize,
             true);
         renderMipPanel(
-            denseMip,
+            denseMipChain[1],
             framebuffer,
             left + kComparisonSize + kComparisonGap,
-            top);
+            top,
+            kComparisonSize);
         return;
     }
 
@@ -276,12 +321,19 @@ int main()
 {
     const Texture texture = makeCheckerboard(kCheckerSize);
     const Texture denseTexture = makeCheckerboard(1);
-    const MipLevel denseMip = makeMipLevel(denseTexture);
+    const MipChain denseMipChain = makeMipChain(denseTexture);
+    const MipChain regularMipChain = makeMipChain(texture);
     // A 960 x 640 RGBA framebuffer is about 2.5 MB, larger than the default
     // Windows stack. Static storage prevents a stack-overflow crash at startup.
     static Framebuffer framebuffer{};
     int currentMode = 0;
-    renderMode(texture, denseTexture, denseMip, framebuffer, currentMode);
+    renderMode(
+        texture,
+        denseTexture,
+        denseMipChain,
+        regularMipChain,
+        framebuffer,
+        currentMode);
 
     mfb_window* window = mfb_open_ex(
         "Texture Filtering Lab - Nearest Neighbor [1/N]",
@@ -293,9 +345,10 @@ int main()
         return 1;
     }
 
-    std::cout << "Iteration 5 adds a manually generated mipmap level.\n";
+    std::cout << "Iteration 6 adds the complete mipmap chain.\n";
     std::cout << "Press 1/N for Nearest, 2/B for Bilinear, 3/S for Split,"
-                 " 4/M for Minification, 5/P for Mipmap, or Escape to exit.\n";
+                 " 4/M for Minification, 5/P for Mipmap, 6/L for Levels,"
+                 " or Escape to exit.\n";
     mfb_set_keyboard_callback(window, keyboardCallback);
 
     while (mfb_update_events(window) != MFB_STATE_EXIT) {
@@ -305,7 +358,13 @@ int main()
 
         if (gRequestedMode != currentMode) {
             currentMode = gRequestedMode;
-            renderMode(texture, denseTexture, denseMip, framebuffer, currentMode);
+            renderMode(
+                texture,
+                denseTexture,
+                denseMipChain,
+                regularMipChain,
+                framebuffer,
+                currentMode);
             if (currentMode == 0) {
                 mfb_set_title(window, "Texture Filtering Lab - Nearest Neighbor [1/N]");
                 std::cout << "Mode: Nearest Neighbor\n";
@@ -322,11 +381,16 @@ int main()
                     window,
                     "Texture Filtering Lab - Minification 64x64 to 32x32 [4/M]");
                 std::cout << "Mode: Minification preview (Nearest | Bilinear)\n";
-            } else {
+            } else if (currentMode == 4) {
                 mfb_set_title(
                     window,
                     "Texture Filtering Lab - Bilinear Base | Mipmap 32x32 [5/P]");
                 std::cout << "Mode: Bilinear base texture | averaged mipmap\n";
+            } else {
+                mfb_set_title(
+                    window,
+                    "Texture Filtering Lab - Mipmap Chain 64 to 1 [6/L]");
+                std::cout << "Mode: Mipmap levels 64, 32, 16, 8, 4, 2, 1\n";
             }
         }
 
