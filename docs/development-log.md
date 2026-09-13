@@ -94,15 +94,47 @@ changed.
 After the storage fix, the application remained open and displayed the 8 x 8
 blue-and-white checker pattern centered on a gray background. The enlarged
 texels had sharp block boundaries, as expected from nearest-neighbor sampling.
-This visually verifies iteration 1. A Git commit is intentionally deferred
-until the student has reviewed and can explain the implementation.
+This visually verified iteration 1, which was then saved as Git commit
+`7999057`.
+
+## Iteration 2 - nearest versus bilinear filtering
+
+### Goal
+
+Implement bilinear sampling manually and allow a direct visual comparison with
+nearest-neighbor sampling using keys `1` and `2`.
+
+### AI prompt
+
+> Starting from the tested nearest-neighbor CPU sampler, add a bilinear sampler
+> as a separate function. Interpolate the four surrounding texels per RGB
+> channel, clamp boundary coordinates, and add keys 1 and 2 to switch methods.
+> Do not add mipmaps or other filtering methods in this iteration.
+
+### Implementation and test results
+
+The first interaction test displayed the nearest image correctly, but pressing
+`2` did not change the filter. The initial loop polled MiniFB's key-state buffer
+without explicitly processing events first. Input handling was revised to
+match the working HW1 structure: `mfb_update_events` runs at the start of each
+frame and a keyboard callback records the requested filter. Keys `N/B` were
+added alongside `1/2` to make the controls unambiguous.
+
+The next visual test showed that switching worked, but the blue squares became
+brown in bilinear mode. This exposed a color-channel ordering bug: on Windows,
+MiniFB packs colors as `0x00RRGGBB`, while the sampler had initially read red
+from the lowest byte and blue from the highest byte. The shifts were corrected.
+
+The final visual test passed: `1/N` restored sharp nearest-neighbor boundaries,
+`2/B` selected bilinear filtering, the boundaries became smoothly blended, and
+the checkerboard remained blue and white. The console and window title also
+reported each selected mode correctly.
 
 ### Student review checklist
 
-- [ ] I can explain why the square requires two triangles.
-- [ ] I can identify the four values stored for each vertex.
-- [ ] I can explain what the vertex shader sends to the fragment shader.
-- [ ] I can explain what `texture(checkerTexture, uv)` returns.
-- [ ] I built the project successfully.
-- [ ] I saw the checkerboard and saved a screenshot.
-- [ ] I recorded any error and the change that fixed it.
+- [ ] I can explain how nearest-neighbor chooses one texel.
+- [ ] I can identify the four texels used by bilinear filtering.
+- [ ] I can explain the roles of `tx` and `ty` in interpolation.
+- [x] I built the project successfully.
+- [x] I switched between both filters and saved a screenshot.
+- [x] I recorded the input and color bugs and the changes that fixed them.
