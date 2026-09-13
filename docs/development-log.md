@@ -204,3 +204,37 @@ motivates the mipmap iteration.
 - [ ] I understand why fine checker details disappear during minification.
 - [x] I ran minification mode and saved a screenshot.
 - [x] I observed that neither nearest nor bilinear preserves the dense pattern.
+
+## Iteration 5 - first mipmap level
+
+### Goal
+
+Generate a 32 x 32 mipmap level manually by averaging each 2 x 2 texel block
+from the dense 64 x 64 source, then compare it with direct bilinear sampling of
+the original texture.
+
+### AI prompt
+
+> Build one 32 x 32 mipmap level from the dense texture. For each mip texel,
+> average the red, green, and blue channels of the corresponding 2 x 2 source
+> block. Add a comparison mode with direct bilinear minification on the left and
+> the prefiltered mip level on the right. Keep earlier modes unchanged.
+
+### Implementation and test result
+
+`makeMipLevel` constructs the level once at startup. Each destination texel
+averages the RGB channels of exactly four source texels. The comparison keeps
+direct bilinear minification on the left and displays the generated mip level
+on the right.
+
+The student's screenshot verified the result. Direct bilinear sampling showed
+a broad false gradient, while the mipmap was a uniform blue-gray average. The
+uniform result is correct for this one-texel checkerboard because every 2 x 2
+source block contains two blue and two white texels.
+
+### Student review checklist
+
+- [ ] I understand that one mip texel summarizes four source texels.
+- [ ] I understand why this particular mipmap becomes one uniform color.
+- [x] I ran mipmap mode and saved a screenshot.
+- [x] I observed that the false gradient disappears with the mipmap.
