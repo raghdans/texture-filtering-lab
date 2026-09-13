@@ -1,28 +1,50 @@
 # Texture Filtering Lab
 
-An incremental computer-graphics project for implementing and comparing
-texture filtering methods.
+An interactive computer-graphics project that implements and compares texture
+filtering and mipmapping algorithms.
 
-## Current state: iteration 8
+## Final result
 
-The program creates a small checkerboard texture in memory and enlarges it with
-manually implemented nearest-neighbor and bilinear samplers. It supports each
-filter separately and a side-by-side comparison mode. MiniFB,
-the same display library used by the course's HW1 project, presents the pixel
-buffer in a window. MiniFB is only the presentation layer; the sampling
-algorithm is implemented in `src/main.cpp`.
+The program procedurally creates checkerboard textures and implements:
 
-The project does **not** yet contain mipmaps, trilinear filtering, camera
-controls, or performance measurements. Those belong to later iterations.
+- nearest-neighbor sampling;
+- bilinear sampling by interpolating four neighboring texels;
+- texture-minification and aliasing demonstrations;
+- a complete mipmap chain from 64 x 64 to 1 x 1;
+- automatic mip-level selection based on output resolution;
+- interactive output resizing with live mip-level selection.
+
+MiniFB presents the completed CPU framebuffer in a Windows window. It does not
+perform the filtering: all sampling, color interpolation, 2 x 2 averaging, and
+mipmap selection are implemented in `src/main.cpp`.
+
+## Controls
+
+| Key | View |
+| --- | --- |
+| `1` or `N` | Nearest-neighbor sampling |
+| `2` or `B` | Bilinear sampling |
+| `3` or `S` | Nearest and bilinear side by side |
+| `4` or `M` | Minification aliasing experiment |
+| `5` or `P` | Direct bilinear minification versus a mipmap |
+| `6` or `L` | Complete mipmap chain |
+| `7` or `A` | Automatic selection for four output sizes |
+| `8` or `I` | Interactive automatic selection |
+| Up / Down | Resize in interactive mode |
+| Escape | Exit |
+
+The title and console report the active mode. Interactive mode also reports the
+output size and selected mip resolution.
 
 ## Build on Windows
 
 Requirements:
 
-- CMake 3.20 or newer
-- A C++17 compiler, such as Visual Studio 2026
+- CMake 3.20 or newer;
+- a C++17 compiler, such as Visual Studio 2026 with Desktop development with
+  C++ installed.
 
-Commands from the project directory:
+From the project directory:
 
 ```powershell
 cmake -S . -B build
@@ -30,26 +52,21 @@ cmake --build build --config Release
 .\build\Release\texture_filtering_lab.exe
 ```
 
-Press `1/N` for nearest-neighbor, `2/B` for bilinear, `3/S` for the split
-comparison, `4/M` for the minification experiment, or Escape to close the
-program. Press `5/P` to compare direct bilinear minification with a manually
-generated 32 x 32 mipmap level.
-Press `6/L` to display the complete mipmap chain from 64 x 64 to 1 x 1.
-Press `7/A` to demonstrate automatic mip-level selection for four output sizes.
-Press `8/I` for interactive mode, then use Up and Down to change the displayed
-size and watch the selected mip level update.
+MiniFB is included under `external/minifb` with its MIT license. No downloaded
+runtime dependencies or image files are required.
 
-MiniFB is stored inside `external/minifb` under its MIT license. The project
-does not need Python or downloaded dependencies.
+## Concepts demonstrated
 
-## What to understand
+1. A texel is a pixel stored in a texture; a screen pixel belongs to the output.
+2. Nearest-neighbor chooses one texel and produces sharp, block-like edges.
+3. Bilinear filtering blends four surrounding texels.
+4. Direct sampling can create false patterns during strong minification.
+5. Each mipmap level averages 2 x 2 blocks from the preceding level.
+6. Choosing a mip resolution close to the output reduces aliasing.
 
-1. The texture is a 64 x 64 array of packed RGB pixels.
-2. The framebuffer is a separate 960 x 640 pixel array.
-3. Each output pixel is assigned normalized `(u, v)` coordinates.
-4. `sampleNearest` converts `(u, v)` into one integer texel coordinate.
-5. Clamping prevents sampling outside the texture array.
-6. MiniFB displays the completed framebuffer but does not perform filtering.
+## Development evidence
 
-7. Split mode uses the same tested samplers and changes only the framebuffer
-   layout.
+The project was developed and visually verified in eight Git iterations. The
+prompts, failed experiments, bugs, corrections, and test results are recorded
+in `docs/development-log.md`. A short Hebrew explanation is available in
+`docs/project-summary-he.md`.

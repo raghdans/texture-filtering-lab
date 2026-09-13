@@ -331,3 +331,11 @@ while appropriate, then changed automatically to 32 for the 32-pixel output.
 - [ ] I understand why the selected level changes when output reaches 32.
 - [x] I changed the size interactively with the arrow keys.
 - [x] I captured the `Output 32 | Mip 32` result and console history.
+
+## Finalization
+
+After all eight iterations were visually verified, the README was updated to
+describe the completed program instead of its earlier intermediate state. A
+short Hebrew project explanation was added for student review. A clean CMake
+Release configuration and build completed successfully in
+`build/final-release`; generated build files remain excluded from Git.
