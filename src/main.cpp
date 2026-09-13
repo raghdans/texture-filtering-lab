@@ -15,11 +15,12 @@ constexpr int kDisplaySize = 512;
 constexpr int kComparisonSize = 384;
 constexpr int kComparisonGap = 24;
 constexpr int kCheckerSize = 8;
+constexpr int kMinifiedSize = 32;
 
 using Texture = std::array<std::uint32_t, kTextureSize * kTextureSize>;
 using Framebuffer = std::array<std::uint32_t, kWindowWidth * kWindowHeight>;
 
-int gRequestedMode = 0; // 0 = nearest, 1 = bilinear, 2 = side-by-side
+int gRequestedMode = 0; // 0 = nearest, 1 = bilinear, 2 = split, 3 = minified
 bool gQuitRequested = false;
 
 void keyboardCallback(mfb_window*, mfb_key key, mfb_key_mod, bool isPressed)
@@ -34,17 +35,19 @@ void keyboardCallback(mfb_window*, mfb_key key, mfb_key_mod, bool isPressed)
         gRequestedMode = 1;
     } else if (key == KB_KEY_3 || key == KB_KEY_S) {
         gRequestedMode = 2;
+    } else if (key == KB_KEY_4 || key == KB_KEY_M) {
+        gRequestedMode = 3;
     } else if (key == KB_KEY_ESCAPE) {
         gQuitRequested = true;
     }
 }
 
-Texture makeCheckerboard()
+Texture makeCheckerboard(int checkerSize)
 {
     Texture texture{};
     for (int y = 0; y < kTextureSize; ++y) {
         for (int x = 0; x < kTextureSize; ++x) {
-            const bool light = ((x / kCheckerSize) + (y / kCheckerSize)) % 2 == 0;
+            const bool light = ((x / checkerSize) + (y / checkerSize)) % 2 == 0;
             texture[static_cast<std::size_t>(y * kTextureSize + x)] =
                 light ? MFB_RGB(235, 235, 235) : MFB_RGB(35, 75, 145);
         }
@@ -129,14 +132,17 @@ void renderPanel(
     int left,
     int top,
     int displaySize,
+    int samplingGridSize,
     bool useBilinear)
 {
     for (int screenY = 0; screenY < displaySize; ++screenY) {
         for (int screenX = 0; screenX < displaySize; ++screenX) {
-            const float u = static_cast<float>(screenX) /
-                            static_cast<float>(displaySize - 1);
-            const float v = static_cast<float>(screenY) /
-                            static_cast<float>(displaySize - 1);
+            const int sampleX = screenX * samplingGridSize / displaySize;
+            const int sampleY = screenY * samplingGridSize / displaySize;
+            const float u = static_cast<float>(sampleX) /
+                            static_cast<float>(samplingGridSize - 1);
+            const float v = static_cast<float>(sampleY) /
+                            static_cast<float>(samplingGridSize - 1);
 
             const int framebufferX = left + screenX;
             const int framebufferY = top + screenY;
@@ -148,40 +154,63 @@ void renderPanel(
     }
 }
 
-void renderMode(const Texture& texture, Framebuffer& framebuffer, int mode)
+void renderMode(
+    const Texture& texture,
+    const Texture& denseTexture,
+    Framebuffer& framebuffer,
+    int mode)
 {
     framebuffer.fill(MFB_RGB(45, 49, 58));
 
-    if (mode == 2) {
+    if (mode == 2 || mode == 3) {
         const int totalWidth = 2 * kComparisonSize + kComparisonGap;
         const int left = (kWindowWidth - totalWidth) / 2;
         const int top = (kWindowHeight - kComparisonSize) / 2;
-        renderPanel(texture, framebuffer, left, top, kComparisonSize, false);
+        const Texture& selectedTexture = mode == 3 ? denseTexture : texture;
+        const int samplingGridSize =
+            mode == 3 ? kMinifiedSize : kComparisonSize;
         renderPanel(
-            texture,
+            selectedTexture,
+            framebuffer,
+            left,
+            top,
+            kComparisonSize,
+            samplingGridSize,
+            false);
+        renderPanel(
+            selectedTexture,
             framebuffer,
             left + kComparisonSize + kComparisonGap,
             top,
             kComparisonSize,
+            samplingGridSize,
             true);
         return;
     }
 
     const int left = (kWindowWidth - kDisplaySize) / 2;
     const int top = (kWindowHeight - kDisplaySize) / 2;
-    renderPanel(texture, framebuffer, left, top, kDisplaySize, mode == 1);
+    renderPanel(
+        texture,
+        framebuffer,
+        left,
+        top,
+        kDisplaySize,
+        kDisplaySize,
+        mode == 1);
 }
 
 } // namespace
 
 int main()
 {
-    const Texture texture = makeCheckerboard();
+    const Texture texture = makeCheckerboard(kCheckerSize);
+    const Texture denseTexture = makeCheckerboard(1);
     // A 960 x 640 RGBA framebuffer is about 2.5 MB, larger than the default
     // Windows stack. Static storage prevents a stack-overflow crash at startup.
     static Framebuffer framebuffer{};
     int currentMode = 0;
-    renderMode(texture, framebuffer, currentMode);
+    renderMode(texture, denseTexture, framebuffer, currentMode);
 
     mfb_window* window = mfb_open_ex(
         "Texture Filtering Lab - Nearest Neighbor [1/N]",
@@ -193,9 +222,9 @@ int main()
         return 1;
     }
 
-    std::cout << "Iteration 3 adds a side-by-side filtering comparison.\n";
+    std::cout << "Iteration 4 adds a texture-minification experiment.\n";
     std::cout << "Press 1/N for Nearest, 2/B for Bilinear, 3/S for Split,"
-                 " or Escape to exit.\n";
+                 " 4/M for Minification, or Escape to exit.\n";
     mfb_set_keyboard_callback(window, keyboardCallback);
 
     while (mfb_update_events(window) != MFB_STATE_EXIT) {
@@ -205,18 +234,23 @@ int main()
 
         if (gRequestedMode != currentMode) {
             currentMode = gRequestedMode;
-            renderMode(texture, framebuffer, currentMode);
+            renderMode(texture, denseTexture, framebuffer, currentMode);
             if (currentMode == 0) {
                 mfb_set_title(window, "Texture Filtering Lab - Nearest Neighbor [1/N]");
                 std::cout << "Mode: Nearest Neighbor\n";
             } else if (currentMode == 1) {
                 mfb_set_title(window, "Texture Filtering Lab - Bilinear [2/B]");
                 std::cout << "Mode: Bilinear\n";
-            } else {
+            } else if (currentMode == 2) {
                 mfb_set_title(
                     window,
                     "Texture Filtering Lab - Split: Nearest | Bilinear [3/S]");
                 std::cout << "Mode: Split comparison (Nearest | Bilinear)\n";
+            } else {
+                mfb_set_title(
+                    window,
+                    "Texture Filtering Lab - Minification 64x64 to 32x32 [4/M]");
+                std::cout << "Mode: Minification preview (Nearest | Bilinear)\n";
             }
         }
 

@@ -170,3 +170,37 @@ right. The window title and console also identify the comparison correctly.
 - [ ] I can explain why only the right panel passes `true` to `renderPanel`.
 - [x] I activated split mode and saved a screenshot.
 - [x] I verified that the left and right panels look different as expected.
+
+## Iteration 4 - texture minification experiment
+
+### Goal
+
+Demonstrate minification and aliasing before implementing mipmaps. A dense
+64 x 64 checkerboard is sampled onto a logical 32 x 32 output. That small result
+is enlarged only for inspection, so individual output pixels remain visible.
+
+### AI prompt
+
+> Add a separate dense checkerboard and a minification comparison mode. Sample
+> the 64 x 64 texture onto a 32 x 32 logical grid using nearest-neighbor on the
+> left and bilinear on the right, then enlarge those results for inspection.
+> Keep all earlier modes available. Do not implement mipmaps yet.
+
+### Implementation and test result
+
+The dense texture alternates color at every texel. Each displayed block
+represents one pixel of the 32 x 32 logical result, enlarged for inspection.
+
+The student's screenshot verified the expected information loss. Nearest
+neighbor collapsed the dense pattern into a few large false-color regions,
+which is severe aliasing. Bilinear produced broad blended gradients instead of
+the original fine pattern. This demonstrates that bilinear filtering alone
+does not correctly average all texels covered by a minified output pixel and
+motivates the mipmap iteration.
+
+### Student review checklist
+
+- [ ] I understand that the large blocks visualize a small 32 x 32 result.
+- [ ] I understand why fine checker details disappear during minification.
+- [x] I ran minification mode and saved a screenshot.
+- [x] I observed that neither nearest nor bilinear preserves the dense pattern.
