@@ -18,6 +18,8 @@ constexpr int kComparisonSize = 384;
 constexpr int kComparisonGap = 24;
 constexpr int kCheckerSize = 8;
 constexpr int kMinifiedSize = 32;
+constexpr int kAutoPreviewSize = 240;
+constexpr int kAutoPreviewGap = 20;
 
 using Texture = std::array<std::uint32_t, kTextureSize * kTextureSize>;
 using Framebuffer = std::array<std::uint32_t, kWindowWidth * kWindowHeight>;
@@ -29,7 +31,7 @@ struct MipLevel {
 
 using MipChain = std::vector<MipLevel>;
 
-int gRequestedMode = 0; // 0 nearest, 1 bilinear, 2 split, 3 minified, 4 mipmap, 5 chain
+int gRequestedMode = 0; // 0 nearest, 1 bilinear, 2 split, 3 minified, 4 mipmap, 5 chain, 6 auto
 bool gQuitRequested = false;
 
 void keyboardCallback(mfb_window*, mfb_key key, mfb_key_mod, bool isPressed)
@@ -50,6 +52,8 @@ void keyboardCallback(mfb_window*, mfb_key key, mfb_key_mod, bool isPressed)
         gRequestedMode = 4;
     } else if (key == KB_KEY_6 || key == KB_KEY_L) {
         gRequestedMode = 5;
+    } else if (key == KB_KEY_7 || key == KB_KEY_A) {
+        gRequestedMode = 6;
     } else if (key == KB_KEY_ESCAPE) {
         gQuitRequested = true;
     }
@@ -233,6 +237,38 @@ void renderMipPanel(
     }
 }
 
+std::size_t chooseMipLevel(const MipChain& chain, int outputSize)
+{
+    std::size_t level = 0;
+    while (level + 1 < chain.size() &&
+           chain[level + 1].size >= outputSize) {
+        ++level;
+    }
+    return level;
+}
+
+void renderAutomaticMipSelection(
+    const MipChain& chain,
+    Framebuffer& framebuffer)
+{
+    const int requestedSizes[] = {64, 32, 16, 8};
+    const int totalSize = 2 * kAutoPreviewSize + kAutoPreviewGap;
+    const int startX = (kWindowWidth - totalSize) / 2;
+    const int startY = (kWindowHeight - totalSize) / 2;
+
+    for (int index = 0; index < 4; ++index) {
+        const std::size_t level = chooseMipLevel(chain, requestedSizes[index]);
+        const int column = index % 2;
+        const int row = index / 2;
+        renderMipPanel(
+            chain[level],
+            framebuffer,
+            startX + column * (kAutoPreviewSize + kAutoPreviewGap),
+            startY + row * (kAutoPreviewSize + kAutoPreviewGap),
+            kAutoPreviewSize);
+    }
+}
+
 void renderMode(
     const Texture& texture,
     const Texture& denseTexture,
@@ -242,6 +278,11 @@ void renderMode(
     int mode)
 {
     framebuffer.fill(MFB_RGB(45, 49, 58));
+
+    if (mode == 6) {
+        renderAutomaticMipSelection(regularMipChain, framebuffer);
+        return;
+    }
 
     if (mode == 5) {
         const int previewSizes[] = {256, 160, 96, 56, 32, 16, 8};
@@ -345,10 +386,10 @@ int main()
         return 1;
     }
 
-    std::cout << "Iteration 6 adds the complete mipmap chain.\n";
+    std::cout << "Iteration 7 adds automatic mipmap-level selection.\n";
     std::cout << "Press 1/N for Nearest, 2/B for Bilinear, 3/S for Split,"
                  " 4/M for Minification, 5/P for Mipmap, 6/L for Levels,"
-                 " or Escape to exit.\n";
+                 " 7/A for Auto, or Escape to exit.\n";
     mfb_set_keyboard_callback(window, keyboardCallback);
 
     while (mfb_update_events(window) != MFB_STATE_EXIT) {
@@ -386,11 +427,17 @@ int main()
                     window,
                     "Texture Filtering Lab - Bilinear Base | Mipmap 32x32 [5/P]");
                 std::cout << "Mode: Bilinear base texture | averaged mipmap\n";
-            } else {
+            } else if (currentMode == 5) {
                 mfb_set_title(
                     window,
                     "Texture Filtering Lab - Mipmap Chain 64 to 1 [6/L]");
                 std::cout << "Mode: Mipmap levels 64, 32, 16, 8, 4, 2, 1\n";
+            } else {
+                mfb_set_title(
+                    window,
+                    "Texture Filtering Lab - Automatic Mipmap Selection [7/A]");
+                std::cout << "Automatic choices: output 64 -> level 64, "
+                             "32 -> 32, 16 -> 16, 8 -> 8\n";
             }
         }
 

@@ -269,3 +269,34 @@ expected from correct low-pass filtering.
 - [ ] I understand why the final 1 x 1 level is the average color of the texture.
 - [x] I displayed and captured the complete seven-level chain.
 - [x] I verified that fine details disappear gradually at smaller levels.
+
+## Iteration 7 - automatic mipmap-level selection
+
+### Goal
+
+Choose the mipmap level whose resolution most closely matches the requested
+output resolution, rather than selecting a level manually.
+
+### AI prompt
+
+> Add a function that selects a mipmap level from the output size. Choose the
+> smallest suitable level without going below the requested resolution. Add an
+> automatic-selection view for output sizes 64, 32, 16, and 8, displayed as a
+> 2 x 2 grid. Keep all earlier modes unchanged.
+
+### Implementation and test result
+
+`chooseMipLevel` starts at the original texture and descends while the next
+level is still large enough for the requested output. The automatic view asks
+for sizes 64, 32, 16, and 8 and renders the selected levels in a 2 x 2 grid.
+
+The student's screenshot verified both the selection and visual stability. The
+console reported `64 -> 64`, `32 -> 32`, `16 -> 16`, and `8 -> 8`, while all
+four enlarged previews retained the same eight-by-eight checker structure.
+
+### Student review checklist
+
+- [ ] I understand why a 16 x 16 output selects the 16 x 16 mip level.
+- [ ] I understand why using a close resolution reduces aliasing and wasted work.
+- [x] I displayed the four automatically selected results.
+- [x] I verified the selected resolutions in the console output.

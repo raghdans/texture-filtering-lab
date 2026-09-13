@@ -3,7 +3,7 @@
 An incremental computer-graphics project for implementing and comparing
 texture filtering methods.
 
-## Current state: iteration 6
+## Current state: iteration 7
 
 The program creates a small checkerboard texture in memory and enlarges it with
 manually implemented nearest-neighbor and bilinear samplers. It supports each
@@ -35,6 +35,7 @@ comparison, `4/M` for the minification experiment, or Escape to close the
 program. Press `5/P` to compare direct bilinear minification with a manually
 generated 32 x 32 mipmap level.
 Press `6/L` to display the complete mipmap chain from 64 x 64 to 1 x 1.
+Press `7/A` to demonstrate automatic mip-level selection for four output sizes.
 
 MiniFB is stored inside `external/minifb` under its MIT license. The project
 does not need Python or downloaded dependencies.
