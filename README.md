@@ -13,6 +13,7 @@ The program procedurally creates checkerboard textures and implements:
 - a complete mipmap chain from 64 x 64 to 1 x 1;
 - automatic mip-level selection based on output resolution;
 - interactive output resizing with live mip-level selection.
+- a perspective surface comparison using per-scanline mip-level selection.
 
 MiniFB presents the completed CPU framebuffer in a Windows window. It does not
 perform the filtering: all sampling, color interpolation, 2 x 2 averaging, and
@@ -30,6 +31,7 @@ mipmap selection are implemented in `src/main.cpp`.
 | `6` or `L` | Complete mipmap chain |
 | `7` or `A` | Automatic selection for four output sizes |
 | `8` or `I` | Interactive automatic selection |
+| `9` or `R` | Perspective: bilinear versus automatic mipmapping |
 | Up / Down | Resize in interactive mode |
 | Escape | Exit |
 

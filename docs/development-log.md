@@ -339,3 +339,37 @@ describe the completed program instead of its earlier intermediate state. A
 short Hebrew project explanation was added for student review. A clean CMake
 Release configuration and build completed successfully in
 `build/final-release`; generated build files remain excluded from Git.
+
+## Iteration 9 - perspective minification
+
+### Goal
+
+Present minification in a more natural scene: two textured trapezoids narrow
+toward the distance. The left surface uses direct bilinear filtering, while the
+right surface selects mipmap levels automatically for each scanline.
+
+### AI prompt
+
+> Add a perspective-style comparison without changing the tested modes. Draw
+> two trapezoidal textured surfaces that narrow toward the top. Use bilinear
+> sampling from the original texture on the left. On the right, select a mip
+> level from each scanline's width and sample that level bilinearly. Add key 9/R.
+
+### Implementation and test result
+
+Each surface is rendered scanline by scanline. Its width grows quadratically
+from 8 pixels in the distance to 360 pixels nearby. The left side always samples
+the original texture bilinearly. The right side selects a mip level from each
+scanline width and then samples that level bilinearly.
+
+The student's screenshot verified two correctly shaped perspective surfaces,
+with stable checker structure from the wide foreground into the narrow distant
+region. The title and console correctly identify direct bilinear filtering on
+the left and automatic mipmapping on the right.
+
+### Student review checklist
+
+- [ ] I understand why the scanlines become narrower toward the top.
+- [ ] I understand why the right surface may use several mip levels at once.
+- [x] I displayed and captured the perspective comparison.
+- [x] I verified that all eight earlier modes remain accessible.

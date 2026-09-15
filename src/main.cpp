@@ -58,6 +58,8 @@ void keyboardCallback(mfb_window*, mfb_key key, mfb_key_mod, bool isPressed)
         gRequestedMode = 6;
     } else if (key == KB_KEY_8 || key == KB_KEY_I) {
         gRequestedMode = 7;
+    } else if (key == KB_KEY_9 || key == KB_KEY_R) {
+        gRequestedMode = 8;
     } else if (key == KB_KEY_UP && gRequestedMode == 7) {
         gRequestedOutputSize = std::min(gRequestedOutputSize * 2, 512);
     } else if (key == KB_KEY_DOWN && gRequestedMode == 7) {
@@ -255,6 +257,76 @@ std::size_t chooseMipLevel(const MipChain& chain, int outputSize)
     return level;
 }
 
+std::uint32_t sampleMipBilinear(const MipLevel& mip, float u, float v)
+{
+    u = std::clamp(u, 0.0F, 1.0F);
+    v = std::clamp(v, 0.0F, 1.0F);
+    const float textureX = u * static_cast<float>(mip.size - 1);
+    const float textureY = v * static_cast<float>(mip.size - 1);
+    const int x0 = static_cast<int>(std::floor(textureX));
+    const int y0 = static_cast<int>(std::floor(textureY));
+    const int x1 = std::min(x0 + 1, mip.size - 1);
+    const int y1 = std::min(y0 + 1, mip.size - 1);
+    const float tx = textureX - static_cast<float>(x0);
+    const float ty = textureY - static_cast<float>(y0);
+    const auto texel = [&mip](int x, int y) {
+        return mip.pixels[static_cast<std::size_t>(y * mip.size + x)];
+    };
+    const std::uint32_t c00 = texel(x0, y0);
+    const std::uint32_t c10 = texel(x1, y0);
+    const std::uint32_t c01 = texel(x0, y1);
+    const std::uint32_t c11 = texel(x1, y1);
+    return MFB_RGB(
+        interpolateChannel(
+            colorChannel(c00, 16), colorChannel(c10, 16),
+            colorChannel(c01, 16), colorChannel(c11, 16), tx, ty),
+        interpolateChannel(
+            colorChannel(c00, 8), colorChannel(c10, 8),
+            colorChannel(c01, 8), colorChannel(c11, 8), tx, ty),
+        interpolateChannel(
+            colorChannel(c00, 0), colorChannel(c10, 0),
+            colorChannel(c01, 0), colorChannel(c11, 0), tx, ty));
+}
+
+void renderPerspectiveComparison(
+    const Texture& texture,
+    const MipChain& chain,
+    Framebuffer& framebuffer)
+{
+    constexpr int panelWidth = 420;
+    constexpr int surfaceHeight = 480;
+    constexpr int topWidth = 8;
+    constexpr int bottomWidth = 360;
+    constexpr int gap = 24;
+    const int firstPanelLeft = (kWindowWidth - 2 * panelWidth - gap) / 2;
+    const int surfaceTop = (kWindowHeight - surfaceHeight) / 2;
+
+    for (int panel = 0; panel < 2; ++panel) {
+        const int panelLeft = firstPanelLeft + panel * (panelWidth + gap);
+        const int centerX = panelLeft + panelWidth / 2;
+        for (int y = 0; y < surfaceHeight; ++y) {
+            const float depth = static_cast<float>(y) /
+                                static_cast<float>(surfaceHeight - 1);
+            const int rowWidth = topWidth + static_cast<int>(
+                depth * depth * static_cast<float>(bottomWidth - topWidth));
+            const int rowLeft = centerX - rowWidth / 2;
+            const std::size_t mipLevel = chooseMipLevel(chain, rowWidth);
+
+            for (int x = 0; x < rowWidth; ++x) {
+                const float u = rowWidth == 1
+                    ? 0.0F
+                    : static_cast<float>(x) / static_cast<float>(rowWidth - 1);
+                const float v = depth;
+                const std::uint32_t color = panel == 0
+                    ? sampleBilinear(texture, u, v)
+                    : sampleMipBilinear(chain[mipLevel], u, v);
+                framebuffer[static_cast<std::size_t>(
+                    (surfaceTop + y) * kWindowWidth + rowLeft + x)] = color;
+            }
+        }
+    }
+}
+
 void renderAutomaticMipSelection(
     const MipChain& chain,
     Framebuffer& framebuffer)
@@ -287,6 +359,11 @@ void renderMode(
     int interactiveOutputSize)
 {
     framebuffer.fill(MFB_RGB(45, 49, 58));
+
+    if (mode == 8) {
+        renderPerspectiveComparison(texture, regularMipChain, framebuffer);
+        return;
+    }
 
     if (mode == 7) {
         const std::size_t level =
@@ -411,10 +488,11 @@ int main()
         return 1;
     }
 
-    std::cout << "Iteration 8 adds interactive size and mip-level selection.\n";
+    std::cout << "Iteration 9 adds a perspective minification comparison.\n";
     std::cout << "Press 1/N for Nearest, 2/B for Bilinear, 3/S for Split,"
                  " 4/M for Minification, 5/P for Mipmap, 6/L for Levels,"
-                 " 7/A for Auto, 8/I for Interactive, or Escape to exit.\n";
+                 " 7/A for Auto, 8/I for Interactive, 9/R for Perspective,"
+                 " or Escape to exit.\n";
     std::cout << "In Interactive mode, use Up/Down to change output size.\n";
     mfb_set_keyboard_callback(window, keyboardCallback);
 
@@ -469,7 +547,7 @@ int main()
                     "Texture Filtering Lab - Automatic Mipmap Selection [7/A]");
                 std::cout << "Automatic choices: output 64 -> level 64, "
                              "32 -> 32, 16 -> 16, 8 -> 8\n";
-            } else {
+            } else if (currentMode == 7) {
                 const std::size_t level =
                     chooseMipLevel(regularMipChain, currentOutputSize);
                 const int mipSize = regularMipChain[level].size;
@@ -480,6 +558,11 @@ int main()
                 mfb_set_title(window, title.c_str());
                 std::cout << "Interactive: output " << currentOutputSize
                           << " -> mip level " << mipSize << "\n";
+            } else {
+                mfb_set_title(
+                    window,
+                    "Texture Filtering Lab - Perspective: Bilinear | Mipmap [9/R]");
+                std::cout << "Perspective: direct bilinear left | automatic mipmap right\n";
             }
         }
 
