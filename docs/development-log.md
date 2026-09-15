@@ -373,3 +373,32 @@ the left and automatic mipmapping on the right.
 - [ ] I understand why the right surface may use several mip levels at once.
 - [x] I displayed and captured the perspective comparison.
 - [x] I verified that all eight earlier modes remain accessible.
+
+## Iteration 10 - on-screen comparison labels
+
+### Goal
+
+Make comparison screenshots understandable without relying only on the console
+or window title.
+
+### AI prompt
+
+> Add a small built-in bitmap font for the labels NEAREST, BILINEAR, and MIPMAP.
+> Draw labels above the relevant side-by-side, minification, mipmap, and
+> perspective views. Keep MiniFB dependency-only and preserve all controls.
+
+### Implementation and test result
+
+A compact 5 x 7 bitmap font is drawn directly into the framebuffer with a
+small dark shadow for contrast. Labels are centered above the relevant panels
+without adding a font or GUI dependency.
+
+The student's screenshot verified clear `BILINEAR` and `MIPMAP` labels above
+the two perspective surfaces. The same label renderer is also used by the
+split, minification, and single-mipmap comparison views.
+
+### Student review checklist
+
+- [ ] I understand that the labels are pixels written into the framebuffer.
+- [x] I captured the labeled perspective comparison.
+- [x] I verified that each label appears above the correct method.

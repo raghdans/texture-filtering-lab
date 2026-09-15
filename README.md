@@ -38,6 +38,9 @@ mipmap selection are implemented in `src/main.cpp`.
 The title and console report the active mode. Interactive mode also reports the
 output size and selected mip resolution.
 
+Comparison views also draw method names directly inside the application window
+so screenshots remain understandable without the console.
+
 ## Build on Windows
 
 Requirements:

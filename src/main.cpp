@@ -349,6 +349,81 @@ void renderAutomaticMipSelection(
     }
 }
 
+std::array<std::uint8_t, 7> glyph(char character)
+{
+    switch (character) {
+    case 'A': return {14, 17, 17, 31, 17, 17, 17};
+    case 'B': return {30, 17, 17, 30, 17, 17, 30};
+    case 'E': return {31, 16, 16, 30, 16, 16, 31};
+    case 'I': return {31, 4, 4, 4, 4, 4, 31};
+    case 'L': return {16, 16, 16, 16, 16, 16, 31};
+    case 'M': return {17, 27, 21, 21, 17, 17, 17};
+    case 'N': return {17, 25, 21, 19, 17, 17, 17};
+    case 'P': return {30, 17, 17, 30, 16, 16, 16};
+    case 'R': return {30, 17, 17, 30, 20, 18, 17};
+    case 'S': return {15, 16, 16, 14, 1, 1, 30};
+    case 'T': return {31, 4, 4, 4, 4, 4, 4};
+    default: return {0, 0, 0, 0, 0, 0, 0};
+    }
+}
+
+void drawText(
+    Framebuffer& framebuffer,
+    int left,
+    int top,
+    const std::string& text,
+    int scale,
+    std::uint32_t color)
+{
+    int characterLeft = left;
+    for (char character : text) {
+        const auto rows = glyph(character);
+        for (int row = 0; row < 7; ++row) {
+            for (int column = 0; column < 5; ++column) {
+                if ((rows[row] & (1U << (4 - column))) == 0) {
+                    continue;
+                }
+                for (int pixelY = 0; pixelY < scale; ++pixelY) {
+                    for (int pixelX = 0; pixelX < scale; ++pixelX) {
+                        const int x = characterLeft + column * scale + pixelX;
+                        const int y = top + row * scale + pixelY;
+                        if (x >= 0 && x < kWindowWidth &&
+                            y >= 0 && y < kWindowHeight) {
+                            framebuffer[static_cast<std::size_t>(
+                                y * kWindowWidth + x)] = color;
+                        }
+                    }
+                }
+            }
+        }
+        characterLeft += 6 * scale;
+    }
+}
+
+void drawCenteredLabel(
+    Framebuffer& framebuffer,
+    int centerX,
+    int top,
+    const std::string& text)
+{
+    constexpr int scale = 2;
+    const int width = static_cast<int>(text.size()) * 6 * scale - scale;
+    drawText(
+        framebuffer,
+        centerX - width / 2 + 2,
+        top + 2,
+        text,
+        scale,
+        MFB_RGB(15, 18, 24));
+    drawText(
+        framebuffer,
+        centerX - width / 2,
+        top,
+        text,
+        scale,
+        MFB_RGB(235, 235, 235));
+}
+
 void renderMode(
     const Texture& texture,
     const Texture& denseTexture,
@@ -362,6 +437,8 @@ void renderMode(
 
     if (mode == 8) {
         renderPerspectiveComparison(texture, regularMipChain, framebuffer);
+        drawCenteredLabel(framebuffer, 258, 42, "BILINEAR");
+        drawCenteredLabel(framebuffer, 702, 42, "MIPMAP");
         return;
     }
 
@@ -415,6 +492,13 @@ void renderMode(
             left + kComparisonSize + kComparisonGap,
             top,
             kComparisonSize);
+        drawCenteredLabel(
+            framebuffer, left + kComparisonSize / 2, top - 34, "BILINEAR");
+        drawCenteredLabel(
+            framebuffer,
+            left + kComparisonSize + kComparisonGap + kComparisonSize / 2,
+            top - 34,
+            "MIPMAP");
         return;
     }
 
@@ -441,6 +525,13 @@ void renderMode(
             kComparisonSize,
             samplingGridSize,
             true);
+        drawCenteredLabel(
+            framebuffer, left + kComparisonSize / 2, top - 34, "NEAREST");
+        drawCenteredLabel(
+            framebuffer,
+            left + kComparisonSize + kComparisonGap + kComparisonSize / 2,
+            top - 34,
+            "BILINEAR");
         return;
     }
 
