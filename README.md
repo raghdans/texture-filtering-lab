@@ -71,7 +71,8 @@ runtime dependencies or image files are required.
 
 ## Development evidence
 
-The project was developed and visually verified in eight Git iterations. The
-prompts, failed experiments, bugs, corrections, and test results are recorded
-in `docs/development-log.md`. A short Hebrew explanation is available in
-`docs/project-summary-he.md`.
+The project was developed and visually verified in ten Git iterations. The
+prompts, failed experiments, bugs, corrections, and test results are available
+in both Hebrew (`docs/development-log.md`) and English
+(`docs/development-log-en.md`). A short Hebrew project explanation is available
+in `docs/project-summary-he.md`.
