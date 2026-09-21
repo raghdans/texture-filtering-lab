@@ -1,226 +1,404 @@
-# יומן הפיתוח — Texture Filtering Lab
+# Development log
 
-זהו תיעוד של העבודה שעשינו על הפרויקט. לא בנינו את הכול בבת אחת: בכל
-איטרציה הוספנו אפשרות אחת, בנינו והרצנו את התוכנית, בדקנו את התוצאה ורק אז
-שמרנו commit. נעזרנו ב־AI להסברים, הצעות ועזרה באיתור תקלות, אבל עברנו על
-השינויים ובדקנו אותם בעצמנו.
+This log records the real development process. It should be updated only after
+an iteration has actually been built and tested.
 
-## איטרציה 1 — Nearest Neighbor
+## Iteration 1 - textured square with nearest filtering
 
-המטרה הראשונה הייתה להציג טקסטורת לוח שחמט בשיטת דגימה אחת בלבד.
-בחרנו להתחיל מ־Nearest Neighbor כי זו השיטה הפשוטה ביותר להבנה: עבור כל
-פיקסל בפלט מוצאים את הטקסל הקרוב ביותר ולוקחים ממנו את הצבע. כך יכולנו קודם
-לוודא שיצירת הטקסטורה, חישוב הקואורדינטות והצגת הפיקסלים עובדים כמו שצריך.
+### Goal
 
-**ה־prompt:**
+Establish the smallest complete texture pipeline before comparing filtering
+methods.
+
+### AI prompt
 
 > Create only the first iteration of a C++17 OpenGL 3.3 texture-filtering lab.
 > Display a square with UV coordinates and a procedural checkerboard texture.
-> Use nearest-neighbor filtering only. Do not implement later features yet.
+> Use nearest-neighbor filtering only. Keep the shaders and data flow explicit,
+> and do not implement later comparison features yet.
 
-בהתחלה CMake לא מצא compiler בגלל כפילות של Path/PATH. לאחר מכן GLAD לא
-נבנה בגלל Jinja2. פתרנו את שתי הבעיות, אך חלון OpenGL נשאר שחור. בדיקות
-פיקסלים הראו שהציור קיים ב־back buffer אך אינו מוצג ב־front buffer במחשב
-שלי. גם ניסיון ללא double buffering לא פתר זאת. כדי לבדוק אם הבעיה קשורה
-למחשב או לדרך שבה OpenGL מציג את החלון, הרצנו את תרגיל בית 1, שמשתמש
-ב־MiniFB. תרגיל בית 1 הוצג כראוי באותו מחשב, ולכן עברנו להצגת framebuffer
-של ה־CPU באמצעות MiniFB, ואת
-אלגוריתמי הדגימה מימשנו ידנית.
+### Design decisions
 
-בבנייה הראשונה היה חסר `MiniFB_cpp.cpp`. לאחר הוספתו התוכנית קרסה בגלל
-stack overflow, כי framebuffer בגודל כ־2.5MB היה משתנה מקומי. העברנו אותו
-לאחסון סטטי. בסוף התקבל לוח שחמט כחול־לבן עם גבולות חדים.
+- A procedural checkerboard avoids adding image-loading complexity in the
+  first iteration.
+- A square makes the relationship between its four UV corners and the texture
+  easy to inspect.
+- Filtering is fixed to `GL_NEAREST` so the next iteration can introduce one
+  controlled change.
+- Shader compilation and linking errors are printed instead of silently
+  failing.
 
-האיטרציה הזאת הייתה ארוכה מהמתוכנן, אבל היא הייתה חשובה כי היא יצרה בסיס
-יציב לשאר הפרויקט. במקום להמשיך עם חלון שחור, עצרנו, בדקנו כל שלב בנפרד
-ושינינו את דרך ההצגה רק אחרי שהבנו שהבעיה אינה באלגוריתם הדגימה.
+### Verification status
 
-**Commit:** `7999057`
+The initial configuration reported that no compiler was available. Inspection
+showed that Visual Studio and MSVC were installed; the actual cause was a
+duplicate `Path`/`PATH` environment entry in the automated build environment.
+After using a clean environment, CMake detected MSVC 19.51 successfully.
 
-## איטרציה 2 — Bilinear ומעבר בין השיטות
+The next build compiled GLFW but GLAD generation failed because the Python
+interpreter selected by CMake did not contain Jinja2. GLAD was generated with a
+working Python environment and its generated C source and headers were then
+stored in `external/glad`. This removes the Python/Jinja2 requirement from
+future builds.
 
-בשלב הזה רצינו להוסיף שיטה חלקה יותר בלי למחוק או לשנות את המימוש שכבר
-עבד. Bilinear אינו בוחר טקסל אחד, אלא מערבב את הצבעים של ארבעת הטקסלים
-הקרובים לפי המרחק של נקודת הדגימה מכל אחד מהם.
+The Release executable compiled successfully on September 12, 2026. Its first
+visual test opened a valid window but displayed only black. The initial code
+registered a framebuffer-resize callback but did not set the viewport at
+startup. Because the callback is not guaranteed to run during window creation,
+the drawable viewport could remain empty. The code now queries the framebuffer
+size and calls `glViewport` once immediately after loading OpenGL. A second
+visual test still produced a black window, so the viewport hypothesis was not
+sufficient. A diagnostic build now uses a clearly gray background, a distinct
+`Iteration 1.1 Diagnostic` title, and prints the OpenGL version and renderer.
+This separates a render-loop problem from a geometry/texture problem. The next
+visual result again appeared black even though OpenGL 3.3 and the AMD renderer
+were detected correctly. The next diagnostic build reads the center pixel back
+from the framebuffer and prints its RGBA value together with the first OpenGL
+error code. This will show whether rendering succeeds internally but is not
+presented, or whether drawing fails before presentation.
 
-**ה־prompt:**
+The diagnostic result reported a white center pixel (`235, 235, 235, 255`) and
+no OpenGL error (`0x0`) while the visible window remained black. This proves
+that the checkerboard is rendered correctly into the back buffer. The next
+diagnostic reads the same pixel from the front buffer after `glfwSwapBuffers`
+to confirm whether buffer presentation is the failing operation.
+
+The front-buffer test returned (`0, 0, 0, 0`) after the swap. This confirms a
+presentation problem in the GLFW/AMD double-buffer path on the test machine.
+Iteration 1.2 requests a single-buffered GLFW window and calls `glFlush` after
+drawing. This is a temporary, explicit compatibility workaround for validating
+the basic texture pipeline; double buffering should be revisited before later
+camera animation is finalized.
+
+The single-buffered GLFW test also remained visually black. As a control test,
+the course's existing HW1 application was run on the same computer and its
+MiniFB framebuffer displayed correctly. The project architecture was therefore
+revised: MiniFB now presents a CPU pixel buffer, while the texture-sampling
+methods are implemented manually in project code. This avoids the machine's
+GLFW/AMD presentation issue and makes the comparison algorithmic rather than a
+comparison of OpenGL configuration constants. Iteration 1 now implements only
+nearest-neighbor sampling; bilinear and mipmap methods remain future work.
+
+The first MiniFB link attempt reported an unresolved `release_cpp_stub`
+symbol. Comparing the library sources with HW1 showed that `MiniFB_cpp.cpp`
+was missing from the new target. It was added to the project before rebuilding.
+
+The first executable then closed immediately with Windows exit code
+`0xC00000FD`, which means stack overflow. The 960 x 640 framebuffer occupied
+about 2.5 MB and had been declared as a local variable, exceeding the default
+Windows stack. It was moved to static storage; the sampling algorithm was not
+changed.
+
+### Successful visual verification
+
+After the storage fix, the application remained open and displayed the 8 x 8
+blue-and-white checker pattern centered on a gray background. The enlarged
+texels had sharp block boundaries, as expected from nearest-neighbor sampling.
+This visually verified iteration 1, which was then saved as Git commit
+`7999057`.
+
+## Iteration 2 - nearest versus bilinear filtering
+
+### Goal
+
+Implement bilinear sampling manually and allow a direct visual comparison with
+nearest-neighbor sampling using keys `1` and `2`.
+
+### AI prompt
 
 > Starting from the tested nearest-neighbor CPU sampler, add a bilinear sampler
 > as a separate function. Interpolate the four surrounding texels per RGB
-> channel, clamp boundaries, and add keys 1 and 2 to switch methods.
+> channel, clamp boundary coordinates, and add keys 1 and 2 to switch methods.
+> Do not add mipmaps or other filtering methods in this iteration.
 
-הוספנו דגימת Bilinear ידנית. בהרצה הראשונה המקש 2 לא הגיב, ולכן שינינו את
-טיפול האירועים והוספנו keyboard callback. אחר כך הצבע הכחול הפך לחום בגלל
-סדר שגוי של ערוצי RGB ב־MiniFB. תיקנו את ה־bit shifts. בדקנו ש־1/N מציג
-גבולות חדים וש־2/B מציג מעברים חלקים, בלי לשנות את צבעי המקור.
+### Implementation and test results
 
-מהשלב הזה הבנו שהבדל קטן בדרך קריאת ערוצי הצבע יכול לשנות לגמרי את התוצאה,
-ושלא מספיק שהתוכנית מתקמפלת: צריך גם לבדוק בעיניים שהצבעים והמעברים נכונים.
+The first interaction test displayed the nearest image correctly, but pressing
+`2` did not change the filter. The initial loop polled MiniFB's key-state buffer
+without explicitly processing events first. Input handling was revised to
+match the working HW1 structure: `mfb_update_events` runs at the start of each
+frame and a keyboard callback records the requested filter. Keys `N/B` were
+added alongside `1/2` to make the controls unambiguous.
 
-**Commit:** `01965ff`
+The next visual test showed that switching worked, but the blue squares became
+brown in bilinear mode. This exposed a color-channel ordering bug: on Windows,
+MiniFB packs colors as `0x00RRGGBB`, while the sampler had initially read red
+from the lowest byte and blue from the highest byte. The shifts were corrected.
 
-## איטרציה 3 — השוואה זו לצד זו
+The final visual test passed: `1/N` restored sharp nearest-neighbor boundaries,
+`2/B` selected bilinear filtering, the boundaries became smoothly blended, and
+the checkerboard remained blue and white. The console and window title also
+reported each selected mode correctly.
 
-מעבר בין המקשים עבד, אבל היה קשה לזכור במדויק איך נראתה התמונה הקודמת.
-לכן רצינו להציג את שתי השיטות יחד, באותו גודל ועל אותה טקסטורה.
+### Student review checklist
 
-**ה־prompt:**
+- [ ] I can explain how nearest-neighbor chooses one texel.
+- [ ] I can identify the four texels used by bilinear filtering.
+- [ ] I can explain the roles of `tx` and `ty` in interpolation.
+- [x] I built the project successfully.
+- [x] I switched between both filters and saved a screenshot.
+- [x] I recorded the input and color bugs and the changes that fixed them.
 
-> Keep the two tested sampling functions unchanged. Add a mode that draws
-> nearest-neighbor on the left and bilinear on the right, with a gap between
-> them. Use 3 or S and retain the existing modes.
+## Iteration 3 - simultaneous comparison
 
-יצרנו פונקציה כללית בשם `renderPanel` והצגנו את שתי השיטות באותו חלון. כך
-אפשר לראות מיד את הגבולות החדים משמאל ואת הערבוב החלק מימין.
+### Goal
 
-השארנו את פונקציות הדגימה ללא שינוי ורק ארגנו מחדש את ציור הפאנלים. כך
-ההשוואה הוגנת: התוכן והמיקום זהים, ורק שיטת הדגימה משתנה.
+Show nearest-neighbor and bilinear results side by side so their visual
+difference can be inspected at the same moment.
 
-**Commit:** `f7336dd`
+### AI prompt
 
-## איטרציה 4 — הקטנה ו־aliasing
+> Keep the two tested sampling functions unchanged. Add a third display mode
+> that draws nearest-neighbor on the left and bilinear on the right, with a
+> visible gap between them. Use `3` or `S` for this mode and retain the existing
+> single-filter modes. Do not add mipmaps in this iteration.
 
-עד כאן בדקנו בעיקר הגדלה של טקסטורה. רצינו לבדוק גם הקטנה, שבה הרבה טקסלים
-מהמקור צריכים להיות מיוצגים על ידי מספר קטן יותר של פיקסלים.
+### Implementation and test result
 
-**ה־prompt:**
+The framebuffer layout was generalized into a reusable `renderPanel` function.
+Single-filter modes keep the original large image, while split mode draws two
+384 x 384 panels separated by a gray gap. The sampling functions themselves
+were not changed.
 
-> Add a dense 64 x 64 checkerboard and sample it onto a 32 x 32 logical grid
-> using nearest-neighbor on the left and bilinear on the right. Enlarge the
-> results for inspection. Do not implement mipmaps yet.
+The student's screenshot verified that `3/S` activates split mode, with sharp
+nearest-neighbor boundaries on the left and blended bilinear boundaries on the
+right. The window title and console also identify the comparison correctly.
 
-יצרנו טקסטורה צפופה ודגמתי אותה לתמונה קטנה יותר. Nearest יצר אזורים גדולים
-שלא היו במקור, ו־Bilinear יצר מעברי צבע רחבים. הבדיקה המחישה ש־Bilinear לבדו
-אינו פותר aliasing בזמן הקטנה.
+### Student review checklist
 
-הגדלנו על המסך את התוצאה הקטנה רק לצורך הסתכלות. כלומר, המשבצות הגדולות
-בחלון אינן טקסטורה חדשה; כל אחת מהן מייצגת פיקסל אחד מהפלט בגודל 32×32.
-כך היה קל לראות את אובדן הפרטים ואת הדפוסים השגויים שנוצרו.
+- [ ] I can explain why both panels use the same source texture.
+- [ ] I can explain why only the right panel passes `true` to `renderPanel`.
+- [x] I activated split mode and saved a screenshot.
+- [x] I verified that the left and right panels look different as expected.
 
-**Commit:** `8a31a67`
+## Iteration 4 - texture minification experiment
 
-## איטרציה 5 — רמת Mipmap ראשונה
+### Goal
 
-לאחר שראינו את בעיית ה־aliasing, רצינו לבדוק פתרון בסיסי: להכין מראש גרסה
-קטנה של הטקסטורה שכבר מכילה ממוצע של הפרטים מהמקור.
+Demonstrate minification and aliasing before implementing mipmaps. A dense
+64 x 64 checkerboard is sampled onto a logical 32 x 32 output. That small result
+is enlarged only for inspection, so individual output pixels remain visible.
 
-**ה־prompt:**
+### AI prompt
 
-> Build one 32 x 32 mipmap level from the dense texture. Average each 2 x 2
-> source block and compare the result with direct bilinear minification.
+> Add a separate dense checkerboard and a minification comparison mode. Sample
+> the 64 x 64 texture onto a 32 x 32 logical grid using nearest-neighbor on the
+> left and bilinear on the right, then enlarge those results for inspection.
+> Keep all earlier modes available. Do not implement mipmaps yet.
 
-יצרנו רמה בגודל 32×32 באמצעות ממוצע של ארבעה טקסלים לכל טקסל חדש. Bilinear
-ישיר הציג gradient לא רצוי, ואילו ה־Mipmap הציג כחול־אפור אחיד. זו התוצאה
-הנכונה, כי כל בלוק 2×2 מכיל שתי משבצות כחולות ושתי משבצות לבנות.
+### Implementation and test result
 
-כאן הבנו את ההבדל בין Bilinear לבין Mipmap: Bilinear מערבב ארבע דגימות
-בסביבת נקודה מסוימת, ואילו רמת Mipmap מסכמת מראש שטח גדול יותר מהטקסטורה.
-לכן היא מתאימה יותר כאשר התמונה מוצגת בגודל קטן.
+The dense texture alternates color at every texel. Each displayed block
+represents one pixel of the 32 x 32 logical result, enlarged for inspection.
 
-**Commit:** `b78afaa`
+The student's screenshot verified the expected information loss. Nearest
+neighbor collapsed the dense pattern into a few large false-color regions,
+which is severe aliasing. Bilinear produced broad blended gradients instead of
+the original fine pattern. This demonstrates that bilinear filtering alone
+does not correctly average all texels covered by a minified output pixel and
+motivates the mipmap iteration.
 
-## איטרציה 6 — שרשרת Mipmaps מלאה
+### Student review checklist
 
-רמה אחת מתאימה רק לגודל מסוים. כדי לתמוך בכמה דרגות הקטנה, הרחבנו את הרעיון
-לשרשרת שלמה שבה כל רמה נוצרת מהרמה שלפניה.
+- [ ] I understand that the large blocks visualize a small 32 x 32 result.
+- [ ] I understand why fine checker details disappear during minification.
+- [x] I ran minification mode and saved a screenshot.
+- [x] I observed that neither nearest nor bilinear preserves the dense pattern.
 
-**ה־prompt:**
+## Iteration 5 - first mipmap level
 
-> Generalize the 2 x 2 averaging step into a complete mipmap chain. Build each
-> level from the preceding level until 1 x 1 and display all seven levels.
+### Goal
 
-הרחבנו את החישוב לכל הרמות מ־64×64 עד 1×1. בכל שלב הרוחב והגובה קטנים בחצי.
-בדקנו שהפרטים נעלמים בהדרגה ושהרמה האחרונה מכילה את הצבע הממוצע.
+Generate a 32 x 32 mipmap level manually by averaging each 2 x 2 texel block
+from the dense 64 x 64 source, then compare it with direct bilinear sampling of
+the original texture.
 
-הצגת כל הרמות באותו חלון עזרה לי לבדוק שהממדים באמת קטנים בחצי בכל צעד:
-64, 32, 16, 8, 4, 2 ו־1. היא גם המחישה כיצד מידע עדין נעלם בהדרגה ולא
-בבת אחת.
+### AI prompt
 
-**Commit:** `ee65d31`
+> Build one 32 x 32 mipmap level from the dense texture. For each mip texel,
+> average the red, green, and blue channels of the corresponding 2 x 2 source
+> block. Add a comparison mode with direct bilinear minification on the left and
+> the prefiltered mip level on the right. Keep earlier modes unchanged.
 
-## איטרציה 7 — בחירת רמה אוטומטית
+### Implementation and test result
 
-לא רצינו שהמשתמש יצטרך לבחור ידנית רמת Mipmap בכל פעם שגודל הפלט משתנה.
-המטרה הייתה שהתוכנית תבחר רמה שיש בה מספיק מידע לפלט, אבל לא הרבה יותר
-ממה שנדרש.
+`makeMipLevel` constructs the level once at startup. Each destination texel
+averages the RGB channels of exactly four source texels. The comparison keeps
+direct bilinear minification on the left and displays the generated mip level
+on the right.
 
-**ה־prompt:**
+The student's screenshot verified the result. Direct bilinear sampling showed
+a broad false gradient, while the mipmap was a uniform blue-gray average. The
+uniform result is correct for this one-texel checkerboard because every 2 x 2
+source block contains two blue and two white texels.
 
-> Select a mipmap level from the output size. Add a view for output sizes 64,
-> 32, 16, and 8 in a 2 x 2 grid. Keep all earlier modes.
+### Student review checklist
 
-כתבנו את `chooseMipLevel`, שבוחרת את הרמה הקרובה לגודל הפלט בלי לרדת לרמה
-קטנה מדי. ה־console אישר את הבחירות 64→64, 32→32, 16→16 ו־8→8.
+- [ ] I understand that one mip texel summarizes four source texels.
+- [ ] I understand why this particular mipmap becomes one uniform color.
+- [x] I ran mipmap mode and saved a screenshot.
+- [x] I observed that the false gradient disappears with the mipmap.
 
-הצגנו את ארבע התוצאות ברשת 2×2 כדי לבדוק גם את הבחירה וגם את המראה. למרות
-הגדלים השונים, מבנה לוח השחמט נשאר דומה, וזה הראה שהרמה המתאימה נבחרת ולא
-נוצרת קפיצה חזותית חריגה.
+## Iteration 6 - complete mipmap chain
 
-**Commit:** `c3393ad`
+### Goal
 
-## איטרציה 8 — שינוי גודל בזמן אמת
+Generate every mipmap level from 64 x 64 down to 1 x 1 and display the levels
+as a descending sequence.
 
-אחרי שבדקנו ארבעה גדלים קבועים, רצינו להפוך את הבדיקה לאינטראקטיבית. כך
-אפשר לראות בזמן אמת את הקשר בין גודל הפלט לבין רמת ה־Mipmap שנבחרת.
+### AI prompt
 
-**ה־prompt:**
+> Generalize the tested 2 x 2 averaging step into a complete mipmap chain.
+> Build each level from the immediately preceding level until reaching 1 x 1.
+> Add a display mode for the seven levels and keep all prior modes unchanged.
 
-> Add an interactive mode entered with 8 or I. Use Up and Down to double or
-> halve the output size between 8 and 512, and select the mip level automatically.
+### Implementation and test result
 
-הוספנו מצב שבו החצים משנים את גודל הפלט. בדקנו את הרצף 256, 128, 64 ו־32.
-כאשר הפלט הגיע ל־32, התוכנית עברה אוטומטית מרמת 64 לרמת 32.
+The fixed 32 x 32 mip type was generalized into a chain of levels. Starting
+with the original image, the program repeatedly halves the dimensions and
+averages 2 x 2 blocks until it reaches 1 x 1.
 
-כותרת החלון וה־console מציגים גם את גודל הפלט וגם את הרמה שנבחרה. הוספנו
-את המידע הזה כדי שלא נצטרך להסיק רק לפי התמונה אם האלגוריתם קיבל החלטה
-נכונה.
+The student's screenshot verified all seven levels in descending order. The
+larger levels retain the checker pattern. Once a level becomes too small to
+represent the original checks, it converges to their blue-gray average, as
+expected from correct low-pass filtering.
 
-**Commit:** `dcabd0c`
+### Student review checklist
 
-## איטרציה 9 — הקטנה בפרספקטיבה
+- [ ] I understand why each level has half the width and height of the previous one.
+- [ ] I understand why the final 1 x 1 level is the average color of the texture.
+- [x] I displayed and captured the complete seven-level chain.
+- [x] I verified that fine details disappear gradually at smaller levels.
 
-הבדיקות הקודמות השתמשו בריבועים שטוחים. רצינו להציג מצב שדומה יותר לרצפה
-או לכביש שמתרחק מהמצלמה, שבו אותה טקסטורה נעשית צרה יותר ככל שמתרחקים.
+## Iteration 7 - automatic mipmap-level selection
 
-**ה־prompt:**
+### Goal
 
-> Draw two perspective-style textured surfaces. Use direct bilinear sampling
-> on the left and automatic mip selection per scanline on the right. Add key 9/R.
+Choose the mipmap level whose resolution most closely matches the requested
+output resolution, rather than selecting a level manually.
 
-ציירנו שני משטחים שמתרחבים מלמעלה למטה. הצד השמאלי תמיד משתמש ב־Bilinear
-מהטקסטורה המקורית. הצד הימני בוחר רמת Mipmap לפי רוחב כל שורה. בדקנו ששני
-המשטחים מוצגים נכון ושכל המצבים הקודמים עדיין זמינים.
+### AI prompt
 
-כל משטח נבנה שורה אחר שורה. השורות הרחוקות צרות ולכן זקוקות לרמת Mipmap
-קטנה יותר, והשורות הקרובות רחבות ומשתמשות ביותר פרטים. זו הדגמה ברורה יותר
-לסיבה שבגללה מנוע גרפי צריך לבחור רמות שונות לפי המרחק.
+> Add a function that selects a mipmap level from the output size. Choose the
+> smallest suitable level without going below the requested resolution. Add an
+> automatic-selection view for output sizes 64, 32, 16, and 8, displayed as a
+> 2 x 2 grid. Keep all earlier modes unchanged.
 
-**Commit:** `a2b5840`
+### Implementation and test result
 
-## איטרציה 10 — כותרות בתוך החלון
+`chooseMipLevel` starts at the original texture and descends while the next
+level is still large enough for the requested output. The automatic view asks
+for sizes 64, 32, 16, and 8 and renders the selected levels in a 2 x 2 grid.
 
-בצילומי המסך היה אפשר להבין את ההשוואה בעזרת ה־console, אבל רצינו שהתמונה
-עצמה תהיה ברורה גם כאשר רואים אותה לבד.
+The student's screenshot verified both the selection and visual stability. The
+console reported `64 -> 64`, `32 -> 32`, `16 -> 16`, and `8 -> 8`, while all
+four enlarged previews retained the same eight-by-eight checker structure.
 
-**ה־prompt:**
+### Student review checklist
 
-> Add a small built-in bitmap font for NEAREST, BILINEAR, and MIPMAP. Draw the
-> labels above the relevant comparisons without adding another dependency.
+- [ ] I understand why a 16 x 16 output selects the 16 x 16 mip level.
+- [ ] I understand why using a close resolution reduces aliasing and wasted work.
+- [x] I displayed the four automatically selected results.
+- [x] I verified the selected resolutions in the console output.
 
-הוספנו גופן bitmap קטן בגודל 5×7 שנכתב ישירות ל־framebuffer. בדקנו שהכותרות
-מופיעות מעל השיטות הנכונות, במיוחד BILINEAR משמאל ו־MIPMAP מימין במצב
-הפרספקטיבה.
+## Iteration 8 - interactive mipmap selection
 
-לא הוספנו ספריית טקסט חדשה. לכל אות הגדרנו תבנית קטנה של פיקסלים, והציור
-שלה נעשה באותו framebuffer שבו מוצגת הטקסטורה. זו תוספת קטנה, אבל היא הופכת
-את ההדגמה ואת צילומי המסך לקלים יותר להבנה.
+### Goal
 
-**Commit:** `9b4db5c`
+Let the user resize the rendered texture and observe automatic mip-level
+selection in real time.
 
-## סיכום אישי של התהליך
+### AI prompt
 
-בסוף ביצענו בניית Release ובדקנו את כל תשעת מצבי התצוגה. במהלך העבודה היו
-ניסיונות שלא הצליחו, במיוחד חלון OpenGL השחור, ולכן שינינו את דרך הצגת
-הפיקסלים. בהמשך תיקנו גם בעיות זיכרון, קלט וסדר צבעים. כל תיקון נבדק לפני
-שהמשכנו לשלב הבא. התוצאה הסופית מאפשרת לראות בפועל את ההבדלים בין Nearest
-Neighbor, Bilinear ו־Mipmaps ואת ההשפעה שלהם בזמן הגדלה והקטנה.
+> Add an interactive mode entered with `8` or `I`. Use the Up and Down arrow
+> keys to double or halve the output size between 8 and 512 pixels. After each
+> change, select the mipmap level automatically, redraw the centered texture,
+> and report both sizes in the window title and console. Preserve earlier modes.
+
+### Implementation and test result
+
+Interactive mode starts with a 256-pixel output. Up and Down double or halve
+the size within the 8-to-512 range. Every change reruns `chooseMipLevel`,
+recenters the image, and updates both the title and console.
+
+The student's screenshots verified entry into interactive mode and the full
+downward sequence `256 -> 128 -> 64 -> 32`. The selected level stayed at 64
+while appropriate, then changed automatically to 32 for the 32-pixel output.
+
+### Student review checklist
+
+- [ ] I understand why outputs larger than 64 use the original 64 mip level.
+- [ ] I understand why the selected level changes when output reaches 32.
+- [x] I changed the size interactively with the arrow keys.
+- [x] I captured the `Output 32 | Mip 32` result and console history.
+
+## Finalization
+
+After all eight iterations were visually verified, the README was updated to
+describe the completed program instead of its earlier intermediate state. A
+short Hebrew project explanation was added for student review. A clean CMake
+Release configuration and build completed successfully in
+`build/final-release`; generated build files remain excluded from Git.
+
+## Iteration 9 - perspective minification
+
+### Goal
+
+Present minification in a more natural scene: two textured trapezoids narrow
+toward the distance. The left surface uses direct bilinear filtering, while the
+right surface selects mipmap levels automatically for each scanline.
+
+### AI prompt
+
+> Add a perspective-style comparison without changing the tested modes. Draw
+> two trapezoidal textured surfaces that narrow toward the top. Use bilinear
+> sampling from the original texture on the left. On the right, select a mip
+> level from each scanline's width and sample that level bilinearly. Add key 9/R.
+
+### Implementation and test result
+
+Each surface is rendered scanline by scanline. Its width grows quadratically
+from 8 pixels in the distance to 360 pixels nearby. The left side always samples
+the original texture bilinearly. The right side selects a mip level from each
+scanline width and then samples that level bilinearly.
+
+The student's screenshot verified two correctly shaped perspective surfaces,
+with stable checker structure from the wide foreground into the narrow distant
+region. The title and console correctly identify direct bilinear filtering on
+the left and automatic mipmapping on the right.
+
+### Student review checklist
+
+- [ ] I understand why the scanlines become narrower toward the top.
+- [ ] I understand why the right surface may use several mip levels at once.
+- [x] I displayed and captured the perspective comparison.
+- [x] I verified that all eight earlier modes remain accessible.
+
+## Iteration 10 - on-screen comparison labels
+
+### Goal
+
+Make comparison screenshots understandable without relying only on the console
+or window title.
+
+### AI prompt
+
+> Add a small built-in bitmap font for the labels NEAREST, BILINEAR, and MIPMAP.
+> Draw labels above the relevant side-by-side, minification, mipmap, and
+> perspective views. Keep MiniFB dependency-only and preserve all controls.
+
+### Implementation and test result
+
+A compact 5 x 7 bitmap font is drawn directly into the framebuffer with a
+small dark shadow for contrast. Labels are centered above the relevant panels
+without adding a font or GUI dependency.
+
+The student's screenshot verified clear `BILINEAR` and `MIPMAP` labels above
+the two perspective surfaces. The same label renderer is also used by the
+split, minification, and single-mipmap comparison views.
+
+### Student review checklist
+
+- [ ] I understand that the labels are pixels written into the framebuffer.
+- [x] I captured the labeled perspective comparison.
+- [x] I verified that each label appears above the correct method.
