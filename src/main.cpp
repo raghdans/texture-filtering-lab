@@ -354,15 +354,20 @@ std::array<std::uint8_t, 7> glyph(char character)
     switch (character) {
     case 'A': return {14, 17, 17, 31, 17, 17, 17};
     case 'B': return {30, 17, 17, 30, 17, 17, 30};
+    case 'C': return {14, 17, 16, 16, 16, 17, 14};
     case 'E': return {31, 16, 16, 30, 16, 16, 31};
+    case 'F': return {31, 16, 16, 30, 16, 16, 16};
     case 'I': return {31, 4, 4, 4, 4, 4, 31};
     case 'L': return {16, 16, 16, 16, 16, 16, 31};
     case 'M': return {17, 27, 21, 21, 17, 17, 17};
     case 'N': return {17, 25, 21, 19, 17, 17, 17};
+    case 'O': return {14, 17, 17, 17, 17, 17, 14};
     case 'P': return {30, 17, 17, 30, 16, 16, 16};
     case 'R': return {30, 17, 17, 30, 20, 18, 17};
     case 'S': return {15, 16, 16, 14, 1, 1, 30};
     case 'T': return {31, 4, 4, 4, 4, 4, 4};
+    case 'U': return {17, 17, 17, 17, 17, 17, 14};
+    case 'V': return {17, 17, 17, 17, 17, 10, 4};
     default: return {0, 0, 0, 0, 0, 0, 0};
     }
 }
@@ -437,6 +442,8 @@ void renderMode(
 
     if (mode == 8) {
         renderPerspectiveComparison(texture, regularMipChain, framebuffer);
+        drawCenteredLabel(
+            framebuffer, kWindowWidth / 2, 10, "PERSPECTIVE COMPARISON");
         drawCenteredLabel(framebuffer, 258, 42, "BILINEAR");
         drawCenteredLabel(framebuffer, 702, 42, "MIPMAP");
         return;
@@ -453,11 +460,15 @@ void renderMode(
             left,
             top,
             interactiveOutputSize);
+        drawCenteredLabel(
+            framebuffer, kWindowWidth / 2, 20, "INTERACTIVE MIPMAP");
         return;
     }
 
     if (mode == 6) {
         renderAutomaticMipSelection(regularMipChain, framebuffer);
+        drawCenteredLabel(
+            framebuffer, kWindowWidth / 2, 20, "AUTOMATIC MIPMAP");
         return;
     }
 
@@ -471,6 +482,8 @@ void renderMode(
                 regularMipChain[level], framebuffer, left, top, previewSize);
             left += previewSize + 24;
         }
+        drawCenteredLabel(
+            framebuffer, kWindowWidth / 2, 20, "MIPMAP LEVELS");
         return;
     }
 
@@ -499,6 +512,8 @@ void renderMode(
             left + kComparisonSize + kComparisonGap + kComparisonSize / 2,
             top - 34,
             "MIPMAP");
+        drawCenteredLabel(
+            framebuffer, kWindowWidth / 2, 20, "MIPMAP COMPARISON");
         return;
     }
 
@@ -532,6 +547,11 @@ void renderMode(
             left + kComparisonSize + kComparisonGap + kComparisonSize / 2,
             top - 34,
             "BILINEAR");
+        drawCenteredLabel(
+            framebuffer,
+            kWindowWidth / 2,
+            20,
+            mode == 3 ? "MINIFICATION" : "FILTER COMPARISON");
         return;
     }
 
@@ -545,6 +565,11 @@ void renderMode(
         kDisplaySize,
         kDisplaySize,
         mode == 1);
+    drawCenteredLabel(
+        framebuffer,
+        kWindowWidth / 2,
+        20,
+        mode == 1 ? "BILINEAR" : "NEAREST");
 }
 
 } // namespace
