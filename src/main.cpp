@@ -378,6 +378,7 @@ std::array<std::uint8_t, 7> glyph(char character)
     case 'T': return {31, 4, 4, 4, 4, 4, 4};
     case 'U': return {17, 17, 17, 17, 17, 17, 14};
     case 'V': return {17, 17, 17, 17, 17, 10, 4};
+    case 'X': return {17, 17, 10, 4, 10, 17, 17};
     default: return {0, 0, 0, 0, 0, 0, 0};
     }
 }
@@ -419,9 +420,9 @@ void drawCenteredLabel(
     Framebuffer& framebuffer,
     int centerX,
     int top,
-    const std::string& text)
+    const std::string& text,
+    int scale = 2)
 {
-    constexpr int scale = 2;
     const int width = static_cast<int>(text.size()) * 6 * scale - scale;
     drawText(
         framebuffer,
@@ -494,6 +495,15 @@ void renderMode(
             const int top = (kWindowHeight - previewSize) / 2;
             renderMipPanel(
                 regularMipChain[level], framebuffer, left, top, previewSize);
+            const std::string levelSize =
+                std::to_string(regularMipChain[level].size) + "X" +
+                std::to_string(regularMipChain[level].size);
+            drawCenteredLabel(
+                framebuffer,
+                left + previewSize / 2,
+                top + previewSize + 10,
+                levelSize,
+                1);
             left += previewSize + 24;
         }
         drawCenteredLabel(
