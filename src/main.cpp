@@ -484,6 +484,25 @@ void renderMode(
         renderAutomaticMipSelection(regularMipChain, framebuffer);
         drawCenteredLabel(
             framebuffer, kWindowWidth / 2, 20, "AUTOMATIC MIPMAP");
+        const int requestedSizes[] = {64, 32, 16, 8};
+        const int totalSize = 2 * kAutoPreviewSize + kAutoPreviewGap;
+        const int startX = (kWindowWidth - totalSize) / 2;
+        const int startY = (kWindowHeight - totalSize) / 2;
+        for (int index = 0; index < 4; ++index) {
+            const int column = index % 2;
+            const int row = index / 2;
+            const std::size_t level =
+                chooseMipLevel(regularMipChain, requestedSizes[index]);
+            drawCenteredLabel(
+                framebuffer,
+                startX + column * (kAutoPreviewSize + kAutoPreviewGap) +
+                    kAutoPreviewSize / 2,
+                startY + row * (kAutoPreviewSize + kAutoPreviewGap) +
+                    kAutoPreviewSize + 4,
+                "OUTPUT " + std::to_string(requestedSizes[index]) +
+                    " MIP " + std::to_string(regularMipChain[level].size),
+                1);
+        }
         return;
     }
 
